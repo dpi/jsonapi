@@ -140,7 +140,7 @@ class BlockContentTest extends ResourceTestBase {
         ],
       ],
     ];
-    if (floatval(\Drupal::VERSION) >= 8.7) {
+    if (floatval(\Drupal::VERSION) >= 8.6) {
       $expected_document['data']['attributes']['reusable'] = TRUE;
     }
     return $expected_document;
