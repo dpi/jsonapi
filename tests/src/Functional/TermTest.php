@@ -218,7 +218,7 @@ class TermTest extends ResourceTestBase {
       ];
     }
 
-    return [
+    $expected_document = [
       'jsonapi' => [
         'meta' => [
           'links' => [
@@ -269,6 +269,12 @@ class TermTest extends ResourceTestBase {
         ],
       ],
     ];
+
+    if (floatval(\Drupal::VERSION) >= 8.6) {
+      $expected_document['data']['attributes']['status'] = TRUE;
+    }
+
+    return $expected_document;
   }
 
   /**
@@ -343,7 +349,9 @@ class TermTest extends ResourceTestBase {
   protected function getExpectedUnauthorizedAccessMessage($method) {
     switch ($method) {
       case 'GET':
-        return "The 'access content' permission is required.";
+        return floatval(\Drupal::VERSION) >= 8.6
+          ? "The 'access content' permission is required and the taxonomy term must be published."
+          : "The 'access content' permission is required.";
 
       case 'POST':
         return "The following permissions are required: 'create terms in camelids' OR 'administer taxonomy'.";
