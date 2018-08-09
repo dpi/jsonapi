@@ -22,6 +22,13 @@ class EntityCollection implements \IteratorAggregate, \Countable {
   protected $entities;
 
   /**
+   * The number of resources permitted in this collection.
+   *
+   * @var int
+   */
+  protected $cardinality;
+
+  /**
    * Holds a boolean indicating if there is a next page.
    *
    * @var bool
@@ -38,17 +45,25 @@ class EntityCollection implements \IteratorAggregate, \Countable {
   /**
    * Instantiates a EntityCollection object.
    *
-   * @param \Drupal\Core\Entity\EntityInterface|null[] $entities
-   *   The entities for the collection.
+   * @param \Drupal\Core\Entity\EntityInterface|null[] $resources
+   *   The resources for the collection.
+   * @param int $cardinality
+   *   The number of resources that this collection may contain. Related
+   *   resource collections may handle both to-one or to-many relationships. A
+   *   to-one relationship should have a cardinality of 1. Use -1 for unlimited
+   *   cardinality.
    */
-  public function __construct(array $entities) {
+  public function __construct(array $resources, $cardinality = -1) {
     assert(Inspector::assertAll(function ($entity) {
       return $entity === NULL
         || $entity instanceof EntityInterface
         || $entity instanceof LabelOnlyEntity
         || $entity instanceof EntityAccessDeniedHttpException;
-    }, $entities));
-    $this->entities = $entities;
+    }, $resources));
+    assert($cardinality >= -1 && $cardinality !== 0, 'Cardinality must be -1 for unlimited cardinality or a positive integer.');
+    assert($cardinality === -1 || count($resources) <= $cardinality, 'If cardinality is not unlimited, the number of given resources must not exceed the cardinality of the collection.');
+    $this->entities = $resources;
+    $this->cardinality = $cardinality;
   }
 
   /**
@@ -116,6 +131,16 @@ class EntityCollection implements \IteratorAggregate, \Countable {
    */
   public function setHasNextPage($has_next_page) {
     $this->hasNextPage = (bool) $has_next_page;
+  }
+
+  /**
+   * Gets the cardinality of this collection.
+   *
+   * @return int
+   *   The cardinality of the resource collection. -1 for unlimited cardinality.
+   */
+  public function getCardinality() {
+    return $this->cardinality;
   }
 
 }

@@ -47,12 +47,7 @@ trait ResourceResponseTestTrait {
       $response_document = $response->getResponseData();
       $merge_errors = function ($errors) use (&$merged_document, $is_multiple) {
         foreach ($errors as $error) {
-          if ($is_multiple) {
-            $merged_document['meta']['errors'][] = $error;
-          }
-          else {
-            $merged_document['errors'][] = $error;
-          }
+          $merged_document['meta']['errors'][] = $error;
         }
       };
       // If any of the response documents had top-level or meta errors, we
@@ -90,6 +85,9 @@ trait ResourceResponseTestTrait {
       unset($merged_document['links']);
     }
     else {
+      if (!isset($merged_document['data'])) {
+        $merged_document['data'] = $is_multiple ? [] : NULL;
+      }
       $merged_document['links'] = ['self' => $self_link];
       // @todo Assign this to every document, even with errors in https://www.drupal.org/project/jsonapi/issues/2949807
       $merged_document['jsonapi'] = [
@@ -101,32 +99,9 @@ trait ResourceResponseTestTrait {
         'version' => '1.0',
       ];
     }
-    // If any successful code exists, use that one. Partial success isn't
-    // defined by HTTP semantics. When different response codes exist, fall
-    // back to a more general code. Any one success will make the merged request
-    // a success.
-    $merged_response_code = array_reduce($responses, function ($merged_response_code, $response) {
-      $response_code = $response->getStatusCode();
-      assert($response_code >= 200 && $response_code < 500, 'Responses must be valid and complete to be merged.');
-      assert(!($response_code >= 300 && $response_code < 400), 'Redirect responses cannot be merged.');
-      // In the initial case, use the first response code.
-      if (is_null($merged_response_code)) {
-        return $response_code;
-      }
-      // If the codes match, keep them.
-      elseif ($merged_response_code === $response_code) {
-        return $merged_response_code;
-      }
-      // If the current code or the prior code is successful, use a general 200.
-      elseif (($response_code >= 200 && $response_code < 300) || ($merged_response_code >= 200 && $merged_response_code < 300)) {
-        return 200;
-      }
-      // There are different client errors, return a general 400.
-      else {
-        return 400;
-      }
-    }, NULL);
-    return (new ResourceResponse($merged_document, $merged_response_code))->addCacheableDependency($merged_cacheability);
+    // All collections should be 200, without regard for the status of the
+    // individual resources in those collections.
+    return (new ResourceResponse($merged_document, 200))->addCacheableDependency($merged_cacheability);
   }
 
   /**
@@ -499,6 +474,35 @@ trait ResourceResponseTestTrait {
       $error['source']['pointer'] = ($pointer) ? $pointer : $relationship_field_name;
     }
     return (new ResourceResponse(['errors' => [$error]], 403))->addCacheableDependency($access);
+  }
+
+  /**
+   * Gets a generic empty collection response.
+   *
+   * @param int $cardinality
+   *   The cardinality of the resource collection. 1 for a to-one related
+   *   resource collection; -1 for an unlimited cardinality.
+   * @param string $self_link
+   *   The self link for collection ResourceResponse.
+   *
+   * @return \Drupal\jsonapi\ResourceResponse
+   *   The empty collection ResourceResponse.
+   */
+  protected static function getEmptyCollectionResponse($cardinality, $self_link) {
+    return new ResourceResponse([
+      // Empty to-one relationships should be NULL and empty to-many
+      // relationships should be an empty array.
+      'data' => $cardinality === 1 ? NULL : [],
+      'jsonapi' => [
+        'meta' => [
+          'links' => [
+            'self' => 'http://jsonapi.org/format/1.0/',
+          ],
+        ],
+        'version' => '1.0',
+      ],
+      'links' => ['self' => $self_link],
+    ]);
   }
 
 }

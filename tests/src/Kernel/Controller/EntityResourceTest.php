@@ -381,10 +381,8 @@ class EntityResourceTest extends JsonapiKernelTestBase {
     ]);
     $response = $this->entityResource->getRelated($resource_type, $this->node, 'uid', new Request());
     $this->assertInstanceOf(JsonApiDocumentTopLevel::class, $response->getResponseData());
-    $this->assertInstanceOf(User::class, $response->getResponseData()
-      ->getData());
-    $this->assertEquals(1, $response->getResponseData()->getData()->id());
-    $this->assertSame(['user:1'], $response->getResponseData()->getData()->getCacheTags());
+    $this->assertInstanceOf(User::class, $response->getResponseData()->getData()->toArray()[0]);
+    $this->assertEquals(1, $response->getResponseData()->getData()->toArray()[0]->id());
     $this->assertEquals(['node:1'], $response->getCacheableMetadata()->getCacheTags());
     // to-many relationship.
     $response = $this->entityResource->getRelated($resource_type, $this->node4, 'field_relationships', new Request());
@@ -393,11 +391,7 @@ class EntityResourceTest extends JsonapiKernelTestBase {
     $this->assertInstanceOf(EntityCollection::class, $response
       ->getResponseData()
       ->getData());
-    $this->assertEquals(
-      ['node:1', 'node:2', 'node:3', 'node:4'],
-      $response->getCacheableMetadata()->getCacheTags()
-    );
-    $this->assertSame(['user.permissions'], $response->getCacheableMetadata()->getCacheContexts());
+    $this->assertEquals(['node:4'], $response->getCacheableMetadata()->getCacheTags());
   }
 
   /**

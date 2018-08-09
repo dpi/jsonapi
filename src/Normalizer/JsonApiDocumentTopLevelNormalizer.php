@@ -180,7 +180,10 @@ class JsonApiDocumentTopLevelNormalizer extends NormalizerBase implements Denorm
         $this->serializer->normalize($data, $format, $context),
       ];
       $link_context = ['link_manager' => $this->linkManager];
-      return new JsonApiDocumentTopLevelNormalizerValue($normalizer_values, $context, $link_context, FALSE);
+      // RelationshipNormalizerValues already handle single vs multiple
+      // multiple cardinality fields.
+      $cardinality = 1;
+      return new JsonApiDocumentTopLevelNormalizerValue($normalizer_values, $context, $link_context, $cardinality);
     }
     $is_collection = $data instanceof EntityCollection;
     $include_count = $context['resource_type']->includeCount();
@@ -205,7 +208,7 @@ class JsonApiDocumentTopLevelNormalizer extends NormalizerBase implements Denorm
       $link_context['total_count'] = $context['total_count'];
     }
 
-    return new JsonApiDocumentTopLevelNormalizerValue($normalizer_values, $context, $link_context, $is_collection);
+    return new JsonApiDocumentTopLevelNormalizerValue($normalizer_values, $context, $link_context, $is_collection ? $data->getCardinality() : 1);
   }
 
   /**

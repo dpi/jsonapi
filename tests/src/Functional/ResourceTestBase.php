@@ -1701,28 +1701,24 @@ abstract class ResourceTestBase extends BrowserTestBase {
         if (empty($relationship_document['data'])) {
           $related_response = isset($relationship_document['errors'])
             ? $relationship_response
-            : new ResourceResponse([
-              // Empty to-one relationships should be NULL and empty to-many
-              // relationships should be an empty array.
-              'data' => is_null($relationship_document['data']) ? NULL : [],
-              'jsonapi' => [
-                'meta' => [
-                  'links' => [
-                    'self' => 'http://jsonapi.org/format/1.0/',
-                  ],
-                ],
-                'version' => '1.0',
-              ],
-              'links' => ['self' => $self_link],
-            ]);
+            : static::getEmptyCollectionResponse(!is_null($relationship_document['data']), $self_link);
         }
         else {
           $is_to_one_relationship = static::isResourceIdentifier($relationship_document['data']);
           $resource_identifiers = $is_to_one_relationship
             ? [$relationship_document['data']]
             : $relationship_document['data'];
-          $individual_responses = static::toResourceResponses($this->getResponses(static::getResourceLinks($resource_identifiers), $request_options));
-          $related_response = static::toCollectionResourceResponse($individual_responses, $self_link, !$is_to_one_relationship);
+          // Remove any relationships to 'virtual' resources.
+          $resource_identifiers = array_filter($resource_identifiers, function ($resource_identifier) {
+            return $resource_identifier['id'] !== 'virtual';
+          });
+          if (!empty($resource_identifiers)) {
+            $individual_responses = static::toResourceResponses($this->getResponses(static::getResourceLinks($resource_identifiers), $request_options));
+            $related_response = static::toCollectionResourceResponse($individual_responses, $self_link, !$is_to_one_relationship);
+          }
+          else {
+            $related_response = static::getEmptyCollectionResponse(!$is_to_one_relationship, $self_link);
+          }
         }
       }
       $expected_related_responses[$relationship_field_name] = $related_response;
@@ -2602,10 +2598,10 @@ abstract class ResourceTestBase extends BrowserTestBase {
     foreach ($related_responses as $related_response) {
       $related_document = $related_response->getResponseData();
       $expected_cacheability->addCacheableDependency($related_response->getCacheableMetadata());
-      if (!empty($related_document['errors'])) {
+      if (!empty($related_document['meta']['errors'])) {
         // If any of the related response documents had top-level errors, we
         // should later expect the document to have 'meta' errors too.
-        foreach ($related_document['errors'] as $error) {
+        foreach ($related_document['meta']['errors'] as $error) {
           // @todo remove this when inaccessible relationships are able to raise errors in https://www.drupal.org/project/jsonapi/issues/2956084.
           if (strpos($error['detail'], 'The current user is not allowed to view this relationship.') !== 0) {
             unset($error['source']['pointer']);

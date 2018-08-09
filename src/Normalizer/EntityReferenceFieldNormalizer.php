@@ -103,7 +103,7 @@ class EntityReferenceFieldNormalizer extends FieldNormalizer {
       // And get the translation in the requested language.
       $entity_list[] = $this->entityRepository->getTranslationFromContext($entity);
     }
-    $entity_collection = new EntityCollection($entity_list);
+    $entity_collection = new EntityCollection($entity_list, $cardinality);
     $relationship = new Relationship($this->resourceTypeRepository, $field->getName(), $entity_collection, $field->getEntity(), $field_access, $cardinality, $main_property, $entity_list_metadata);
     return $this->serializer->normalize($relationship, $format, $context);
   }

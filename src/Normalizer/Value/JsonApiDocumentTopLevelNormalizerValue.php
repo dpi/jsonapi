@@ -38,11 +38,11 @@ class JsonApiDocumentTopLevelNormalizerValue implements ValueExtractorInterface,
   protected $context;
 
   /**
-   * Is collection?
+   * The cardinality of the document's primary data.
    *
-   * @var bool
+   * @var int
    */
-  protected $isCollection;
+  protected $cardinality;
 
   /**
    * The link manager.
@@ -69,10 +69,13 @@ class JsonApiDocumentTopLevelNormalizerValue implements ValueExtractorInterface,
    * @param array $link_context
    *   All the objects and variables needed to generate the links for this
    *   relationship.
-   * @param bool $is_collection
-   *   TRUE if this is a serialization for a list.
+   * @param int $cardinality
+   *   The cardinality of the document's primary data. -1 for unlimited
+   *   cardinality. For example, an individual resource would have a cardinality
+   *   of 1. A related resource would have a cardinality of -1 for a to-many
+   *   relationship, but a cardinality of 1 for a to-one relationship.
    */
-  public function __construct(array $values, array $context, array $link_context, $is_collection = FALSE) {
+  public function __construct(array $values, array $context, array $link_context, $cardinality) {
     $this->values = $values;
     array_walk($values, [$this, 'addCacheableDependency']);
     // Make sure that different sparse fieldsets are cached differently.
@@ -83,7 +86,7 @@ class JsonApiDocumentTopLevelNormalizerValue implements ValueExtractorInterface,
     $this->addCacheContexts(['url.site']);
 
     $this->context = $context;
-    $this->isCollection = $is_collection;
+    $this->cardinality = $cardinality;
     $this->linkManager = $link_context['link_manager'];
     // Remove the manager and store the link context.
     unset($link_context['link_manager']);
@@ -135,9 +138,12 @@ class JsonApiDocumentTopLevelNormalizerValue implements ValueExtractorInterface,
       }
     }
     // Deal with the single entity case.
-    $rasterized['data'] = $this->isCollection ?
-      array_filter($rasterized['data']) :
-      reset($rasterized['data']);
+    if ($this->cardinality !== 1) {
+      $rasterized['data'] = array_filter($rasterized['data']);
+    }
+    else {
+      $rasterized['data'] = empty($rasterized['data']) ? NULL : reset($rasterized['data']);
+    }
 
     // Add the self link.
     if ($this->context['request']) {
@@ -146,8 +152,7 @@ class JsonApiDocumentTopLevelNormalizerValue implements ValueExtractorInterface,
       $rasterized['links'] += [
         'self' => $this->linkManager->getRequestLink($request),
       ];
-      // If this is a collection we need to append the pager data.
-      if ($this->isCollection) {
+      if ($this->cardinality !== 1) {
         // Add the pager links.
         $rasterized['links'] += $this->linkManager->getPagerLinks($request, $this->linkContext);
 
@@ -172,7 +177,14 @@ class JsonApiDocumentTopLevelNormalizerValue implements ValueExtractorInterface,
           $rasterized = NestedArray::mergeDeep($rasterized, $included_item);
         }
         else {
-          $rasterized['included'][] = $included_item['data'];
+          if ($included_item['data']) {
+            $rasterized['included'][] = $included_item['data'];
+          }
+          if (!empty($included_item['meta']['errors'])) {
+            foreach ($included_item['meta']['errors'] as $error) {
+              $rasterized['meta']['errors'][] = $error;
+            }
+          }
         }
       }
     }
@@ -201,7 +213,7 @@ class JsonApiDocumentTopLevelNormalizerValue implements ValueExtractorInterface,
     return array_values(array_reduce($includes, function ($unique_includes, $include) {
       $rasterized_include = $include->rasterizeValue();
 
-      if ($rasterized_include['data'] === FALSE) {
+      if (empty($rasterized_include['data'])) {
         $unique_includes[] = $include;
       }
       else {

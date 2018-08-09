@@ -401,28 +401,14 @@ class EntityResource {
    *   The requested entity.
    * @param string $related_field
    *   The related field name.
-   * @param \Symfony\Component\HttpFoundation\Request $request
-   *   The request object.
    *
    * @return \Drupal\jsonapi\ResourceResponse
    *   The response.
    */
-  public function getRelated(ResourceType $resource_type, FieldableEntityInterface $entity, $related_field, Request $request) {
+  public function getRelated(ResourceType $resource_type, FieldableEntityInterface $entity, $related_field) {
     /* @var \Drupal\Core\Field\EntityReferenceFieldItemListInterface $field_list */
     $field_list = $entity->get($resource_type->getInternalName($related_field));
-    // Add the cacheable metadata from the host entity.
-    $cacheable_metadata = CacheableMetadata::createFromObject($entity);
-    $is_multiple = $field_list
-      ->getDataDefinition()
-      ->getFieldStorageDefinition()
-      ->isMultiple();
-    if (!$is_multiple && $field_list->entity) {
-      $response = $this->getIndividual($resource_type, $field_list->entity, $request);
-      // Add cacheable metadata for host entity to individual response.
-      $response->addCacheableDependency($cacheable_metadata);
-      return $response;
-    }
-    $collection_data = [];
+
     // Remove the entities pointing to a resource that may be disabled. Even
     // though the normalizer skips disabled references, we can avoid unnecessary
     // work by checking here too.
@@ -436,16 +422,16 @@ class EntityResource {
         );
       }
     );
+    $collection_data = [];
     foreach ($referenced_entities as $referenced_entity) {
-      $collection_data[$referenced_entity->id()] = static::getAccessCheckedEntity($referenced_entity);
-      $cacheable_metadata->addCacheableDependency($referenced_entity);
+      $collection_data[] = static::getAccessCheckedEntity($referenced_entity);
     }
-    $entity_collection = new EntityCollection($collection_data);
+    $entity_collection = new EntityCollection($collection_data, $field_list->getFieldDefinition()->getFieldStorageDefinition()->getCardinality());
     $response = $this->buildWrappedResponse($entity_collection);
 
     // $response does not contain the entity list cache tag. We add the
     // cacheable metadata for the finite list of entities in the relationship.
-    $response->addCacheableDependency($cacheable_metadata);
+    $response->addCacheableDependency($entity);
 
     return $response;
   }
