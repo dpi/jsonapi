@@ -208,6 +208,7 @@ class UserTest extends ResourceTestBase {
     $response = $this->request('PATCH', $url, $request_options);
     // @todo Remove $expected + assertResourceResponse() in favor of the commented line below once https://www.drupal.org/project/jsonapi/issues/2943176 lands.
     $expected_document = [
+      'jsonapi' => static::$jsonApiMember,
       'errors' => [
         [
           'title' => 'Unprocessable Entity',
@@ -248,6 +249,7 @@ class UserTest extends ResourceTestBase {
     $response = $this->request('PATCH', $url, $request_options);
     // @todo Remove $expected + assertResourceResponse() in favor of the commented line below once https://www.drupal.org/project/jsonapi/issues/2943176 lands.
     $expected_document = [
+      'jsonapi' => static::$jsonApiMember,
       'errors' => [
         [
           'title' => 'Unprocessable Entity',
@@ -291,6 +293,7 @@ class UserTest extends ResourceTestBase {
     $response = $this->request('PATCH', $url, $request_options);
     // @todo Remove $expected + assertResourceResponse() in favor of the commented line below once https://www.drupal.org/project/jsonapi/issues/2943176 lands.
     $expected_document = [
+      'jsonapi' => static::$jsonApiMember,
       'errors' => [
         [
           'title' => 'Forbidden',
@@ -462,7 +465,7 @@ class UserTest extends ResourceTestBase {
     $request_options = NestedArray::mergeDeep($request_options, $this->getAuthenticationRequestOptions());
 
     $response = $this->request('GET', $collection_url, $request_options);
-    $this->assertResourceErrorResponse(400, "Filtering on config entities is not supported by Drupal's entity API. You tried to filter on a Role config entity.", $response);
+    $this->assertResourceErrorResponse(400, "Filtering on config entities is not supported by Drupal's entity API. You tried to filter on a Role config entity.", $response, FALSE, ['4xx-response', 'http_response'], [''], FALSE, 'UNCACHEABLE');
   }
 
   /**

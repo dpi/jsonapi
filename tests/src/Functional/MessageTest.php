@@ -172,7 +172,7 @@ class MessageTest extends ResourceTestBase {
     // 405 because Message entities are not stored, so they cannot be retrieved,
     // yet the same URL can be used to POST them.
     $response = $this->request('GET', $collection_url, $request_options);
-    $this->assertResourceErrorResponse(405, 'No route found for "GET /jsonapi/contact_message/camelids": Method Not Allowed (Allow: POST)', $response);
+    $this->assertResourceErrorResponse(405, 'No route found for "GET /jsonapi/contact_message/camelids": Method Not Allowed (Allow: POST)', $response, FALSE, ['4xx-response', 'http_response'], [''], FALSE, 'UNCACHEABLE');
   }
 
 }

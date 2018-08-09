@@ -92,7 +92,15 @@ class RestJsonApiUnsupported extends ResourceTestBase {
     $request_options = [];
 
     $response = $this->request('GET', $url, $request_options);
-    $this->assertResourceErrorResponse(406, FALSE, $response);
+    $this->assertResourceErrorResponse(
+      406,
+      FALSE,
+      $response,
+      ['4xx-response', 'config:user.role.anonymous', 'http_response', 'node:1'],
+      ['user.permissions'],
+      'MISS',
+      'UNCACHEABLE'
+    );
   }
 
   /**

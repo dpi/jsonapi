@@ -139,6 +139,18 @@ abstract class ResourceTestBase extends BrowserTestBase {
   protected static $anonymousUsersCanViewLabels = FALSE;
 
   /**
+   * The standard `jsonapi` top-level document member.
+   *
+   * @var array
+   */
+  protected static $jsonApiMember = [
+    'version' => '1.0',
+    'meta' => [
+      'links' => ['self' => 'http://jsonapi.org/format/1.0/'],
+    ],
+  ];
+
+  /**
    * The entity being tested.
    *
    * @var \Drupal\Core\Entity\EntityInterface
@@ -807,6 +819,7 @@ abstract class ResourceTestBase extends BrowserTestBase {
     }
 
     $expected_document = [
+      'jsonapi' => static::$jsonApiMember,
       'errors' => [
         0 => $expected_error,
       ],
@@ -913,6 +926,7 @@ abstract class ResourceTestBase extends BrowserTestBase {
       $reason = $this->getExpectedUnauthorizedAccessMessage('GET');
       // @todo Remove $expected + assertResourceResponse() in favor of the commented line below once https://www.drupal.org/project/jsonapi/issues/2943176 lands.
       $expected_document = [
+        'jsonapi' => static::$jsonApiMember,
         'errors' => [
           [
             'title' => 'Forbidden',
@@ -950,6 +964,7 @@ abstract class ResourceTestBase extends BrowserTestBase {
     $url_reserved_custom_query_parameter = $url_reserved_custom_query_parameter->setOption('query', ['foo' => 'bar']);
     $response = $this->request('GET', $url_reserved_custom_query_parameter, $request_options);
     $expected_document = [
+      'jsonapi' => static::$jsonApiMember,
       'errors' => [
         [
           'title' => 'Bad Request',
@@ -962,7 +977,7 @@ abstract class ResourceTestBase extends BrowserTestBase {
         ],
       ],
     ];
-    $this->assertResourceResponse(400, $expected_document, $response);
+    $this->assertResourceResponse(400, $expected_document, $response, ['4xx-response', 'http_response'], [''], FALSE, 'UNCACHEABLE');
 
     // 200 for well-formed HEAD request.
     $response = $this->request('HEAD', $url, $request_options);
@@ -1054,7 +1069,7 @@ abstract class ResourceTestBase extends BrowserTestBase {
     $message_url = clone $url;
     $path = str_replace($random_uuid, '{' . static::$entityTypeId . '}', $message_url->setAbsolute()->setOptions(['base_url' => '', 'query' => []])->toString());
     $message = 'The "' . static::$entityTypeId . '" parameter was not converted for the path "' . $path . '" (route name: "jsonapi.' . static::$resourceTypeName . '.individual")';
-    $this->assertResourceErrorResponse(404, $message, $response);
+    $this->assertResourceErrorResponse(404, $message, $response, FALSE, ['4xx-response', 'http_response'], [''], FALSE, 'UNCACHEABLE');
 
     // DX: when Accept request header is missing, still 404, but HTML response.
     unset($request_options[RequestOptions::HEADERS]['Accept']);
@@ -1140,6 +1155,7 @@ abstract class ResourceTestBase extends BrowserTestBase {
     }, []);
     $expected_response = static::decorateExpectedResponseForIncludedFields($expected_response, $related_responses);
     $expected_cacheability = $expected_response->getCacheableMetadata();
+    $expected_cacheability->setCacheTags(array_values(array_diff($expected_cacheability->getCacheTags(), ['4xx-response'])));
     $expected_document = $expected_response->getResponseData();
     // @todo remove this loop in https://www.drupal.org/project/jsonapi/issues/2853066.
     if (!empty($expected_document['meta']['errors'])) {
@@ -1171,6 +1187,7 @@ abstract class ResourceTestBase extends BrowserTestBase {
     }, []);
     $expected_response = static::decorateExpectedResponseForIncludedFields($expected_response, $related_responses);
     $expected_cacheability = $expected_response->getCacheableMetadata();
+    $expected_cacheability->setCacheTags(array_values(array_diff($expected_cacheability->getCacheTags(), ['4xx-response'])));
     $expected_document = $expected_response->getResponseData();
     // @todo remove this loop in https://www.drupal.org/project/jsonapi/issues/2853066.
     if (!empty($expected_document['meta']['errors'])) {
@@ -1608,14 +1625,7 @@ abstract class ResourceTestBase extends BrowserTestBase {
     $data = $this->getExpectedGetRelationshipDocumentData($relationship_field_name, $entity);
     return [
       'data' => $data,
-      'jsonapi' => [
-        'meta' => [
-          'links' => [
-            'self' => 'http://jsonapi.org/format/1.0/',
-          ],
-        ],
-        'version' => '1.0',
-      ],
+      'jsonapi' => static::$jsonApiMember,
       'links' => [
         'self' => $self_link,
         'related' => $related_link,
@@ -1690,6 +1700,7 @@ abstract class ResourceTestBase extends BrowserTestBase {
           $detail .= ' ' . $reason;
         }
         $related_response = (new ResourceResponse([
+          'jsonapi' => static::$jsonApiMember,
           'errors' => [
             [
               'status' => 403,
@@ -1855,6 +1866,7 @@ abstract class ResourceTestBase extends BrowserTestBase {
     $label_field_capitalized = $this->entity->getFieldDefinition($label_field)->getLabel();
     // @todo Remove $expected + assertResourceResponse() in favor of the commented line below once https://www.drupal.org/project/jsonapi/issues/2943176 lands.
     $expected_document = [
+      'jsonapi' => static::$jsonApiMember,
       'errors' => [
         [
           'title' => 'Unprocessable Entity',
@@ -1879,6 +1891,7 @@ abstract class ResourceTestBase extends BrowserTestBase {
       $response = $this->request('POST', $url, $request_options);
       // @todo Remove $expected + assertResourceResponse() in favor of the commented line below once https://www.drupal.org/project/jsonapi/issues/2943176 lands.
       $expected_document = [
+        'jsonapi' => static::$jsonApiMember,
         'errors' => [
           [
             'title' => 'Forbidden',
@@ -2089,6 +2102,7 @@ abstract class ResourceTestBase extends BrowserTestBase {
     $label_field_capitalized = $this->entity->getFieldDefinition($label_field)->getLabel();
     // @todo Remove $expected + assertResourceResponse() in favor of the commented line below once https://www.drupal.org/project/jsonapi/issues/2943176 lands.
     $expected_document = [
+      'jsonapi' => static::$jsonApiMember,
       'errors' => [
         [
           'title' => 'Unprocessable Entity',
@@ -2110,6 +2124,7 @@ abstract class ResourceTestBase extends BrowserTestBase {
     $response = $this->request('PATCH', $url, $request_options);
     // @todo Remove $expected + assertResourceResponse() in favor of the commented line below once https://www.drupal.org/project/jsonapi/issues/2943176 lands.
     $expected_document = [
+      'jsonapi' => static::$jsonApiMember,
       'errors' => [
         [
           'title' => 'Forbidden',
@@ -2135,6 +2150,7 @@ abstract class ResourceTestBase extends BrowserTestBase {
     $id_field_name = $this->entity->getEntityType()->getKey('id');
     // @todo Remove $expected + assertResourceResponse() in favor of the commented line below once https://www.drupal.org/project/jsonapi/issues/2943176 lands.
     $expected_document = [
+      'jsonapi' => static::$jsonApiMember,
       'errors' => [
         [
           'title' => 'Forbidden',
@@ -2172,6 +2188,7 @@ abstract class ResourceTestBase extends BrowserTestBase {
     $response = $this->request('PATCH', $url, $request_options);
     // @todo Remove $expected + assertResourceResponse() in favor of the commented line below once https://www.drupal.org/project/jsonapi/issues/2943176 lands.
     $expected_document = [
+      'jsonapi' => static::$jsonApiMember,
       'errors' => [
         [
           'title' => 'Forbidden',
@@ -2201,6 +2218,7 @@ abstract class ResourceTestBase extends BrowserTestBase {
       $response = $this->request('PATCH', $url, $request_options);
       // @todo Remove $expected + assertResourceResponse() in favor of the commented line below once https://www.drupal.org/project/jsonapi/issues/2943176 lands.
       $expected_document = [
+        'jsonapi' => static::$jsonApiMember,
         'errors' => [
           [
             'title' => 'Forbidden',

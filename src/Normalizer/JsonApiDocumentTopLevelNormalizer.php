@@ -9,6 +9,7 @@ use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Field\EntityReferenceFieldItemListInterface;
 use Drupal\jsonapi\Context\FieldResolver;
 use Drupal\jsonapi\Exception\EntityAccessDeniedHttpException;
+use Drupal\jsonapi\JsonApiResource\ErrorCollection;
 use Drupal\jsonapi\Normalizer\Value\JsonApiDocumentTopLevelNormalizerValue;
 use Drupal\jsonapi\JsonApiResource\EntityCollection;
 use Drupal\jsonapi\LinkManager\LinkManager;
@@ -16,6 +17,7 @@ use Drupal\jsonapi\JsonApiResource\JsonApiDocumentTopLevel;
 use Drupal\jsonapi\ResourceType\ResourceType;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
+use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 use Symfony\Component\HttpKernel\Exception\UnprocessableEntityHttpException;
 use Symfony\Component\Serializer\Normalizer\DenormalizerInterface;
 use Symfony\Component\Serializer\Normalizer\NormalizerInterface;
@@ -170,7 +172,17 @@ class JsonApiDocumentTopLevelNormalizer extends NormalizerBase implements Denorm
    * {@inheritdoc}
    */
   public function normalize($object, $format = NULL, array $context = []) {
+    $serializer = $this->serializer;
+
     $data = $object->getData();
+
+    if ($data instanceof ErrorCollection) {
+      $normalizer_values = array_map(function (HttpExceptionInterface $exception) use ($format, $context, $serializer) {
+        return $serializer->normalize($exception, $format, $context);
+      }, (array) $data->getIterator());
+      return new JsonApiDocumentTopLevelNormalizerValue($normalizer_values, ['is_error_document' => TRUE], [], FALSE);
+    }
+
     if (empty($context['expanded'])) {
       $context += $this->expandContext($context['request'], $context['resource_type']);
     }
@@ -194,7 +206,6 @@ class JsonApiDocumentTopLevelNormalizer extends NormalizerBase implements Denorm
     if ($include_count) {
       $context['total_count'] = $is_collection ? $data->getTotalCount() : 1;
     }
-    $serializer = $this->serializer;
     $normalizer_values = array_map(function ($entity) use ($format, $context, $serializer) {
       return $serializer->normalize($entity, $format, $context);
     }, $entities);

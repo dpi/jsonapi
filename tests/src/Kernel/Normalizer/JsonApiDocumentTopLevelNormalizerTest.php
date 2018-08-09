@@ -7,6 +7,7 @@ use Drupal\Core\Cache\Cache;
 use Drupal\Core\Cache\CacheableMetadata;
 use Drupal\Core\Field\FieldStorageDefinitionInterface;
 use Drupal\file\Entity\File;
+use Drupal\jsonapi\JsonApiResource\ErrorCollection;
 use Drupal\jsonapi\LinkManager\LinkManager;
 use Drupal\jsonapi\JsonApiResource\JsonApiDocumentTopLevel;
 use Drupal\node\Entity\Node;
@@ -378,28 +379,13 @@ class JsonApiDocumentTopLevelNormalizerTest extends JsonapiKernelTestBase {
    * @covers ::normalize
    */
   public function testNormalizeException() {
-    list($request, $resource_type) = $this->generateProphecies('node', 'article', 'id');
-    $document_wrapper = $this->prophesize(JsonApiDocumentTopLevel::class);
-    $document_wrapper->getData()->willReturn($this->node);
-    $request->query = new ParameterBag([
-      'fields' => [
-        'node--article' => 'title,node_type,uid',
-        'user--user' => 'name',
-      ],
-      'include' => 'uid',
-    ]);
-
     $normalized = $this
       ->container
       ->get('jsonapi.serializer_do_not_use_removal_imminent')
       ->serialize(
-        new BadRequestHttpException('Lorem'),
+        new JsonApiDocumentTopLevel(new ErrorCollection([new BadRequestHttpException('Lorem')])),
         'api_json',
-        [
-          'request' => $request,
-          'resource_type' => $resource_type,
-          'data_wrapper' => 'errors',
-        ]
+        []
       );
     $normalized = Json::decode($normalized);
     $this->assertNotEmpty($normalized['errors']);

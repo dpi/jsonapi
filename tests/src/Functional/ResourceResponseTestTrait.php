@@ -77,6 +77,14 @@ trait ResourceResponseTestTrait {
       }
       $merged_cacheability->addCacheableDependency($response->getCacheableMetadata());
     }
+    $merged_document['jsonapi'] = [
+      'meta' => [
+        'links' => [
+          'self' => 'http://jsonapi.org/format/1.0/',
+        ],
+      ],
+      'version' => '1.0',
+    ];
     // Until we can reasonably know what caused an error, we shouldn't include
     // 'self' links in error documents. For example, a 404 shouldn't have a
     // 'self' link because HATEOAS links shouldn't point to resources which do
@@ -89,15 +97,6 @@ trait ResourceResponseTestTrait {
         $merged_document['data'] = $is_multiple ? [] : NULL;
       }
       $merged_document['links'] = ['self' => $self_link];
-      // @todo Assign this to every document, even with errors in https://www.drupal.org/project/jsonapi/issues/2949807
-      $merged_document['jsonapi'] = [
-        'meta' => [
-          'links' => [
-            'self' => 'http://jsonapi.org/format/1.0/',
-          ],
-        ],
-        'version' => '1.0',
-      ];
     }
     // All collections should be 200, without regard for the status of the
     // individual resources in those collections.
@@ -188,11 +187,11 @@ trait ResourceResponseTestTrait {
     if ($cache_tags = $response->getHeader('X-Drupal-Cache-Tags')) {
       $cacheability->addCacheTags(explode(' ', $cache_tags[0]));
     }
-    if ($cache_contexts = $response->getHeader('X-Drupal-Cache-Contexts')) {
-      $cacheability->addCacheContexts(explode(' ', $cache_contexts[0]));
+    if (!empty($response->getHeaderLine('X-Drupal-Cache-Contexts'))) {
+      $cacheability->addCacheContexts(explode(' ', $response->getHeader('X-Drupal-Cache-Contexts')[0]));
     }
     if ($dynamic_cache = $response->getHeader('X-Drupal-Dynamic-Cache')) {
-      $cacheability->setCacheMaxAge(($dynamic_cache[0] === 'UNCACHEABLE') ? 0 : Cache::PERMANENT);
+      $cacheability->setCacheMaxAge(($dynamic_cache[0] === 'UNCACHEABLE' && $response->getStatusCode() < 400) ? 0 : Cache::PERMANENT);
     }
     $related_document = Json::decode($response->getBody());
     $resource_response = new ResourceResponse($related_document, $response->getStatusCode());
@@ -473,7 +472,11 @@ trait ResourceResponseTestTrait {
     if ($pointer || $pointer !== FALSE && $relationship_field_name) {
       $error['source']['pointer'] = ($pointer) ? $pointer : $relationship_field_name;
     }
-    return (new ResourceResponse(['errors' => [$error]], 403))
+
+    return (new ResourceResponse([
+      'jsonapi' => static::$jsonApiMember,
+      'errors' => [$error],
+    ], 403))
       ->addCacheableDependency((new CacheableMetadata())->addCacheTags(['4xx-response', 'http_response']))
       ->addCacheableDependency($access);
   }
@@ -495,14 +498,7 @@ trait ResourceResponseTestTrait {
       // Empty to-one relationships should be NULL and empty to-many
       // relationships should be an empty array.
       'data' => $cardinality === 1 ? NULL : [],
-      'jsonapi' => [
-        'meta' => [
-          'links' => [
-            'self' => 'http://jsonapi.org/format/1.0/',
-          ],
-        ],
-        'version' => '1.0',
-      ],
+      'jsonapi' => static::$jsonApiMember,
       'links' => ['self' => $self_link],
     ]);
   }

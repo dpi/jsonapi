@@ -9,7 +9,7 @@ namespace Drupal\jsonapi\JsonApiResource;
  *
  * @internal
  *
- * @todo Add the missing required members: 'error' and 'meta' or document why not.
+ * @todo Add the missing required members: 'meta' or document why not.
  * @todo Add support for the missing optional members: 'jsonapi', 'links' and 'included' or document why not.
  */
 class JsonApiDocumentTopLevel {
@@ -17,14 +17,14 @@ class JsonApiDocumentTopLevel {
   /**
    * The data to normalize.
    *
-   * @var \Drupal\Core\Entity\EntityInterface|\Drupal\jsonapi\EntityCollection
+   * @var \Drupal\Core\Entity\EntityInterface|\Drupal\jsonapi\JsonApiResource\EntityCollection|\Drupal\jsonapi\LabelOnlyEntity|\Drupal\jsonapi\JsonApiResource\ErrorCollection
    */
   protected $data;
 
   /**
    * Instantiates a JsonApiDocumentTopLevel object.
    *
-   * @param \Drupal\Core\Entity\EntityInterface|\Drupal\jsonapi\EntityCollection|\Drupal\jsonapi\LabelOnlyEntity $data
+   * @param \Drupal\Core\Entity\EntityInterface|\Drupal\jsonapi\JsonApiResource\EntityCollection|\Drupal\jsonapi\LabelOnlyEntity|\Drupal\jsonapi\JsonApiResource\ErrorCollection $data
    *   The data to normalize. It can be either a straight up entity or a
    *   collection of entities.
    */
@@ -35,7 +35,7 @@ class JsonApiDocumentTopLevel {
   /**
    * Gets the data.
    *
-   * @return \Drupal\Core\Entity\EntityInterface|\Drupal\jsonapi\EntityCollection|\Drupal\jsonapi\LabelOnlyEntity
+   * @return \Drupal\Core\Entity\EntityInterface|\Drupal\jsonapi\JsonApiResource\EntityCollection|\Drupal\jsonapi\LabelOnlyEntity|\Drupal\jsonapi\JsonApiResource\ErrorCollection
    *   The data.
    */
   public function getData() {

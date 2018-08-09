@@ -24,6 +24,16 @@ class JsonApiDocumentTopLevelNormalizerValue implements ValueExtractorInterface,
   protected $values;
 
   /**
+   * Whether this is an errors document or not.
+   *
+   * @var bool
+   *
+   * (The spec says the top-level `data` and `errors` members MUST NOT coexist.)
+   * @see http://jsonapi.org/format/#document-top-level
+   */
+  protected $isErrorsDocument;
+
+  /**
    * The includes.
    *
    * @var array
@@ -78,50 +88,64 @@ class JsonApiDocumentTopLevelNormalizerValue implements ValueExtractorInterface,
   public function __construct(array $values, array $context, array $link_context, $cardinality) {
     $this->values = $values;
     array_walk($values, [$this, 'addCacheableDependency']);
-    // @todo Make this unconditional in https://www.drupal.org/project/jsonapi/issues/2965056.
-    if (!$context['request']->get('_on_relationship')) {
-      // Make sure that different sparse fieldsets are cached differently.
-      $this->addCacheContexts(array_map(function ($query_parameter_name) {
-        return sprintf('url.query_args:%s', $query_parameter_name);
-      }, JsonApiSpec::getReservedQueryParameters()));
-    }
-    // Every JSON API document contains absolute URLs.
-    $this->addCacheContexts(['url.site']);
+    $this->isErrorsDocument = !empty($context['is_error_document']);
 
-    $this->context = $context;
-    $this->cardinality = $cardinality;
-    $this->linkManager = $link_context['link_manager'];
-    // Remove the manager and store the link context.
-    unset($link_context['link_manager']);
-    $this->linkContext = $link_context;
-    // Get an array of arrays of includes.
-    $this->includes = array_map(function ($value) {
-      return $value->getIncludes();
-    }, $values);
-    // Flatten the includes.
-    $this->includes = array_reduce($this->includes, function ($carry, $includes) {
-      array_walk($includes, [$this, 'addCacheableDependency']);
-      return array_merge($carry, $includes);
-    }, []);
-    // Filter the empty values.
-    $this->includes = array_filter($this->includes);
+    if (!$this->isErrorsDocument) {
+      // @todo Make this unconditional in https://www.drupal.org/project/jsonapi/issues/2965056.
+      if (!$context['request']->get('_on_relationship')) {
+        // Make sure that different sparse fieldsets are cached differently.
+        $this->addCacheContexts(array_map(function ($query_parameter_name) {
+          return sprintf('url.query_args:%s', $query_parameter_name);
+        }, JsonApiSpec::getReservedQueryParameters()));
+      }
+      // Every JSON API document contains absolute URLs.
+      $this->addCacheContexts(['url.site']);
+      $this->context = $context;
+
+      $this->cardinality = $cardinality;
+      $this->linkManager = $link_context['link_manager'];
+      // Remove the manager and store the link context.
+      unset($link_context['link_manager']);
+      $this->linkContext = $link_context;
+      // Get an array of arrays of includes.
+      $this->includes = array_map(function ($value) {
+        return $value->getIncludes();
+      }, $values);
+      // Flatten the includes.
+      $this->includes = array_reduce($this->includes, function ($carry, $includes) {
+        array_walk($includes, [$this, 'addCacheableDependency']);
+        return array_merge($carry, $includes);
+      }, []);
+      // Filter the empty values.
+      $this->includes = array_filter($this->includes);
+    }
   }
 
   /**
    * {@inheritdoc}
    */
   public function rasterizeValue() {
-    // Create the array of normalized fields, starting with the URI.
+    // Determine which of the two mutually exclusive top-level document members
+    // should be used.
+    $mutually_exclusive_member = $this->isErrorsDocument ? 'errors' : 'data';
     $rasterized = [
-      'data' => [],
+      $mutually_exclusive_member => [],
       'jsonapi' => [
         'version' => JsonApiSpec::SUPPORTED_SPECIFICATION_VERSION,
         'meta' => [
           'links' => ['self' => JsonApiSpec::SUPPORTED_SPECIFICATION_PERMALINK],
         ],
       ],
-      'links' => [],
     ];
+
+    if ($this->isErrorsDocument) {
+      foreach ($this->values as $normalized_exception) {
+        $rasterized['errors'] = array_merge($rasterized['errors'], $normalized_exception->rasterizeValue());
+      }
+      return $rasterized;
+    }
+
+    $rasterized['links'] = [];
 
     foreach ($this->values as $normalizer_value) {
       if ($normalizer_value instanceof HttpExceptionNormalizerValue) {

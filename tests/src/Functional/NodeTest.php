@@ -250,6 +250,7 @@ class NodeTest extends ResourceTestBase {
     $response = $this->request('PATCH', $url, $request_options);
     // @todo Remove $expected + assertResourceResponse() in favor of the commented line below once https://www.drupal.org/project/jsonapi/issues/2943176 lands.
     $expected_document = [
+      'jsonapi' => static::$jsonApiMember,
       'errors' => [
         [
           'title' => 'Forbidden',
@@ -297,6 +298,7 @@ class NodeTest extends ResourceTestBase {
     $response = $this->request('GET', $url, $request_options);
     // @todo Remove $expected + assertResourceResponse() in favor of the commented line below once https://www.drupal.org/project/jsonapi/issues/2943176 lands.
     $expected_document = [
+      'jsonapi' => static::$jsonApiMember,
       'errors' => [
         [
           'title' => 'Forbidden',
