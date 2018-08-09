@@ -457,6 +457,8 @@ class EntityResource {
     /* @var \Drupal\Core\Field\FieldItemListInterface $field_list */
     $field_list = $entity->get($resource_type->getInternalName($related_field));
     $response = $this->buildWrappedResponse($field_list, $response_code);
+    // Add the host entity as a cacheable dependency.
+    $response->addCacheableDependency($entity);
     return $response;
   }
 

@@ -368,6 +368,17 @@ class TermTest extends ResourceTestBase {
   }
 
   /**
+   * {@inheritdoc}
+   */
+  protected function getExpectedUnauthorizedAccessCacheability() {
+    $cacheability = parent::getExpectedUnauthorizedAccessCacheability();
+    if (floatval(\Drupal::VERSION) >= 8.6) {
+      $cacheability->addCacheableDependency($this->entity);
+    }
+    return $cacheability;
+  }
+
+  /**
    * Tests PATCHing a term's path.
    *
    * For a negative test, see the similar test coverage for Node.

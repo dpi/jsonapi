@@ -4,7 +4,9 @@ namespace Drupal\jsonapi\Access;
 
 use Drupal\Core\Access\AccessResult;
 use Drupal\Core\Access\AccessResultReasonInterface;
+use Drupal\Core\Cache\CacheableMetadata;
 use Drupal\Core\Entity\FieldableEntityInterface;
+use Drupal\Core\Http\Exception\CacheableAccessDeniedHttpException;
 use Drupal\Core\Routing\Access\AccessInterface;
 use Drupal\Core\Session\AccountInterface;
 use Drupal\jsonapi\ResourceType\ResourceType;
@@ -54,9 +56,11 @@ class RelationshipFieldAccess implements AccessInterface {
         if (!$access_result->isAllowed()) {
           $reason = "The current user is not allowed to {$field_operation} this relationship.";
           $access_reason = $access_result instanceof AccessResultReasonInterface ? $access_result->getReason() : NULL;
-          return empty($access_reason)
-            ? $access_result->isForbidden() ? AccessResult::forbidden($reason) : AccessResult::neutral($reason)
-            : $access_result->setReason($reason . " {$access_reason}");
+          $detailed_reason = empty($access_reason) ? $reason : $reason . " {$access_reason}";
+          $access_result->setReason($detailed_reason);
+          if ($request->isMethodCacheable()) {
+            throw new CacheableAccessDeniedHttpException(CacheableMetadata::createFromObject($access_result), $detailed_reason);
+          }
         }
         return $access_result;
       }

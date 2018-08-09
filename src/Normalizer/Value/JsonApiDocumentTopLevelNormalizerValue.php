@@ -78,10 +78,13 @@ class JsonApiDocumentTopLevelNormalizerValue implements ValueExtractorInterface,
   public function __construct(array $values, array $context, array $link_context, $cardinality) {
     $this->values = $values;
     array_walk($values, [$this, 'addCacheableDependency']);
-    // Make sure that different sparse fieldsets are cached differently.
-    $this->addCacheContexts(array_map(function ($query_parameter_name) {
-      return sprintf('url.query_args:%s', $query_parameter_name);
-    }, JsonApiSpec::getReservedQueryParameters()));
+    // @todo Make this unconditional in https://www.drupal.org/project/jsonapi/issues/2965056.
+    if (!$context['request']->get('_on_relationship')) {
+      // Make sure that different sparse fieldsets are cached differently.
+      $this->addCacheContexts(array_map(function ($query_parameter_name) {
+        return sprintf('url.query_args:%s', $query_parameter_name);
+      }, JsonApiSpec::getReservedQueryParameters()));
+    }
     // Every JSON API document contains absolute URLs.
     $this->addCacheContexts(['url.site']);
 

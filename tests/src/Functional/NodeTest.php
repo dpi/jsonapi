@@ -313,7 +313,7 @@ class NodeTest extends ResourceTestBase {
         ],
       ],
     ];
-    $this->assertResourceResponse(403, $expected_document, $response);
+    $this->assertResourceResponse(403, $expected_document, $response, ['4xx-response', 'http_response', 'node:1'], ['user.permissions'], FALSE, 'MISS');
     /* $this->assertResourceErrorResponse(403, 'The current user is not allowed to GET the selected resource.', $response, '/data'); */
 
     // 200 after granting permission.

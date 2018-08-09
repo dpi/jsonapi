@@ -13,6 +13,7 @@ use Drupal\jsonapi\Normalizer\Value\FieldNormalizerValueInterface;
 use Drupal\node\NodeInterface;
 use Drupal\Tests\UnitTestCase;
 use Prophecy\Argument;
+use Symfony\Component\HttpFoundation\Request;
 
 /**
  * @coversDefaultClass \Drupal\jsonapi\Normalizer\Value\JsonApiDocumentTopLevelNormalizerValue
@@ -83,6 +84,8 @@ class JsonApiDocumentTopLevelNormalizerValueTest extends UnitTestCase {
       return $included_item->reveal();
     }, $included));
     $context = [
+      // @todo Remove 'request' in https://www.drupal.org/project/jsonapi/issues/2965056.
+      'request' => new Request(),
       'resource_type' => new ResourceType('node', 'article', NodeInterface::class),
     ];
     $entity = $this->prophesize(EntityInterface::class);

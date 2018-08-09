@@ -422,7 +422,10 @@ abstract class ResourceTestBase extends BrowserTestBase {
   }
 
   /**
-   * {@inheritdoc}
+   * Returns the expected cacheability for an unauthorized response.
+   *
+   * @return \Drupal\Core\Cache\CacheableMetadata
+   *   The expected cacheability.
    */
   protected function getExpectedUnauthorizedAccessCacheability() {
     return (new CacheableMetadata())
@@ -926,10 +929,7 @@ abstract class ResourceTestBase extends BrowserTestBase {
           ],
         ],
       ];
-      $this->assertResourceResponse(403, $expected_document, $response);
-      /* $this->assertResourceErrorResponse(403, "The current user is not allowed to GET the selected resource." . (strlen($reason) ? ' ' . $reason : ''), $response, '/data'); */
-      // @todo Uncomment in https://www.drupal.org/project/jsonapi/issues/2929428.
-      /* $this->assertResourceResponse(403, $expected_document, $response, $expected_403_cacheability->getCacheTags(), $expected_403_cacheability->getCacheContexts(), FALSE, 'MISS'); */
+      $this->assertResourceResponse(403, $expected_document, $response, $expected_403_cacheability->getCacheTags(), $expected_403_cacheability->getCacheContexts(), FALSE, 'MISS');
       $this->assertArrayNotHasKey('Link', $response->getHeaders());
     }
     else {
@@ -1350,11 +1350,17 @@ abstract class ResourceTestBase extends BrowserTestBase {
     foreach ($relationship_field_names as $relationship_field_name) {
       $expected_resource_response = $this->getExpectedGetRelationshipResponse($relationship_field_name);
       $expected_document = $expected_resource_response->getResponseData();
+      $expected_cacheability = $expected_resource_response->getCacheableMetadata();
       $actual_response = $related_responses[$relationship_field_name];
-      /* @var \Psr\Http\Message\ResponseInterface $actual_response */
-      $actual_document = Json::decode((string) $actual_response->getBody());
-      $this->assertSameDocument($expected_document, $actual_document);
-      $this->assertSame($expected_resource_response->getStatusCode(), $actual_response->getStatusCode());
+      $this->assertResourceResponse(
+        $expected_resource_response->getStatusCode(),
+        $expected_document,
+        $actual_response,
+        $expected_cacheability->getCacheTags(),
+        $expected_cacheability->getCacheContexts(),
+        FALSE,
+        $expected_resource_response->isSuccessful() ? 'MISS' : FALSE
+      );
     }
   }
 
@@ -1570,8 +1576,14 @@ abstract class ResourceTestBase extends BrowserTestBase {
       return static::getAccessDeniedResponse($this->entity, $access, $relationship_field_name, 'The current user is not allowed to view this relationship.', FALSE);
     }
     $expected_document = $this->getExpectedGetRelationshipDocument($relationship_field_name);
+    $expected_cacheability = (new CacheableMetadata())
+      ->addCacheTags($this->getExpectedCacheTags([]))
+      ->addCacheContexts(['url.site'])
+      ->addCacheableDependency($entity)
+      ->addCacheableDependency($access);
     $status_code = isset($expected_document['errors'][0]['status']) ? $expected_document['errors'][0]['status'] : 200;
     $resource_response = new ResourceResponse($expected_document, $status_code);
+    $resource_response->addCacheableDependency($expected_cacheability);
     return $resource_response;
   }
 
@@ -2598,6 +2610,7 @@ abstract class ResourceTestBase extends BrowserTestBase {
     foreach ($related_responses as $related_response) {
       $related_document = $related_response->getResponseData();
       $expected_cacheability->addCacheableDependency($related_response->getCacheableMetadata());
+      $expected_cacheability->setCacheTags(array_values(array_diff($expected_cacheability->getCacheTags(), ['4xx-response'])));
       if (!empty($related_document['meta']['errors'])) {
         // If any of the related response documents had top-level errors, we
         // should later expect the document to have 'meta' errors too.

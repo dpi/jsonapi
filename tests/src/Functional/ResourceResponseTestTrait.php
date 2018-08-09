@@ -473,7 +473,9 @@ trait ResourceResponseTestTrait {
     if ($pointer || $pointer !== FALSE && $relationship_field_name) {
       $error['source']['pointer'] = ($pointer) ? $pointer : $relationship_field_name;
     }
-    return (new ResourceResponse(['errors' => [$error]], 403))->addCacheableDependency($access);
+    return (new ResourceResponse(['errors' => [$error]], 403))
+      ->addCacheableDependency((new CacheableMetadata())->addCacheTags(['4xx-response', 'http_response']))
+      ->addCacheableDependency($access);
   }
 
   /**
