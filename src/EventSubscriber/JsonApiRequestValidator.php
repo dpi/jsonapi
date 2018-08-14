@@ -55,9 +55,15 @@ class JsonApiRequestValidator implements EventSubscriberInterface {
       }
     }
 
-    // @todo remove this line and/or comment in https://www.drupal.org/project/jsonapi/issues/2977600.
     // Drupal uses the `_format` query parameter for Content-Type negotiation.
-    $invalid_query_params = array_diff($invalid_query_params, ['_format']);
+    // Using it violates the JSON API spec. Nudge people nicely in the correct
+    // direction. (This is special cased because using it is pretty common.)
+    if (in_array('_format', $invalid_query_params, TRUE)) {
+      $uri_without_query_string = $request->getSchemeAndHttpHost() . $request->getBaseUrl() . $request->getPathInfo();
+      $exception = new BadRequestHttpException('JSON API does not need that ugly \'_format\' query string! 🤘 Use the URL provided in \'links\' 🙏');
+      $exception->setHeaders(['Link' => $uri_without_query_string]);
+      throw $exception;
+    }
 
     if (empty($invalid_query_params)) {
       return NULL;
