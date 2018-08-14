@@ -10,6 +10,7 @@ use Drupal\Core\Field\FieldStorageDefinitionInterface;
 use Drupal\Core\Field\FieldTypePluginManagerInterface;
 use Drupal\Core\Field\TypedData\FieldItemDataDefinition;
 use Drupal\field\Entity\FieldConfig;
+use Drupal\jsonapi\JsonApiResource\ResourceIdentifier;
 use Drupal\jsonapi\Normalizer\RelationshipNormalizer;
 use Drupal\jsonapi\ResourceType\ResourceType;
 use Drupal\jsonapi\ResourceType\ResourceTypeRepository;
@@ -98,7 +99,6 @@ class RelationshipNormalizerTest extends UnitTestCase {
       $resource_type_repository->reveal(),
       $link_manager->reveal(),
       $field_manager->reveal(),
-      $plugin_manager->reveal(),
       $entity_repository->reveal()
     );
   }
@@ -115,7 +115,7 @@ class RelationshipNormalizerTest extends UnitTestCase {
       'target_entity' => $entity->reveal(),
     ];
     $denormalized = $this->normalizer->denormalize($input, NULL, 'api_json', $context);
-    $this->assertSame($expected, $denormalized);
+    $this->assertEquals($expected, $denormalized);
   }
 
   /**
@@ -129,7 +129,7 @@ class RelationshipNormalizerTest extends UnitTestCase {
       [
         ['data' => [['type' => 'lorem--dummy_bundle', 'id' => '4e6cb61d-4f04-437f-99fe-42c002393658']]],
         'field_dummy',
-        [['bunny' => 42]],
+        [new ResourceIdentifier('lorem--dummy_bundle', '4e6cb61d-4f04-437f-99fe-42c002393658')],
       ],
       [
         ['data' => []],

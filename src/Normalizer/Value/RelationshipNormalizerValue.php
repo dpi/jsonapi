@@ -107,7 +107,7 @@ class RelationshipNormalizerValue extends FieldNormalizerValue {
    * @see https://github.com/json-api/json-api/pull/1156#issuecomment-325377995
    * @see https://www.drupal.org/project/jsonapi/issues/2864680
    */
-  protected static function ensureUniqueResourceIdentifierObjects(array $resource_identifier_objects) {
+  public static function ensureUniqueResourceIdentifierObjects(array $resource_identifier_objects) {
     if (count($resource_identifier_objects) <= 1) {
       return $resource_identifier_objects;
     }

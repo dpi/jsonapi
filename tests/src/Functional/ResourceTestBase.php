@@ -658,7 +658,7 @@ abstract class ResourceTestBase extends BrowserTestBase {
    *   Defaults to FALSE.
    */
   protected function assertResourceResponse($expected_status_code, $expected_document, ResponseInterface $response, $expected_cache_tags = FALSE, $expected_cache_contexts = FALSE, $expected_page_cache_header_value = FALSE, $expected_dynamic_page_cache_header_value = FALSE) {
-    $this->assertSame($expected_status_code, $response->getStatusCode());
+    $this->assertSame($expected_status_code, $response->getStatusCode(), var_export(Json::decode((string) $response->getBody()), TRUE));
     if ($expected_status_code === 204) {
       // DELETE responses should not include a Content-Type header. But Apache
       // sets it to 'text/html' by default. We also cannot detect the presence
@@ -1284,17 +1284,17 @@ abstract class ResourceTestBase extends BrowserTestBase {
     $this->doTestRelationshipGet($request_options);
 
     // Test POST.
-    $this->doTestRelationshipPost($request_options);
+    $this->doTestRelationshipMutation($request_options);
     // Grant entity-level edit access.
     $this->setUpAuthorization('PATCH');
-    $this->doTestRelationshipPost($request_options);
+    $this->doTestRelationshipMutation($request_options);
     // Field edit access is still forbidden, grant it.
     $this->grantPermissionsToTestedRole([
       'field_jsonapi_test_entity_ref view access',
       'field_jsonapi_test_entity_ref edit access',
       'field_jsonapi_test_entity_ref update access',
     ]);
-    $this->doTestRelationshipPost($request_options);
+    $this->doTestRelationshipMutation($request_options);
   }
 
   /**
@@ -1390,7 +1390,7 @@ abstract class ResourceTestBase extends BrowserTestBase {
    * @see \GuzzleHttp\ClientInterface::request()
    * @see ::testRelationships
    */
-  protected function doTestRelationshipPost(array $request_options) {
+  protected function doTestRelationshipMutation(array $request_options) {
     /* @var \Drupal\Core\Entity\FieldableEntityInterface $resource */
     $resource = $this->createAnotherEntity('dupe');
     $resource->set('field_jsonapi_test_entity_ref', NULL);
@@ -1467,59 +1467,103 @@ abstract class ResourceTestBase extends BrowserTestBase {
         $this->assertResourceErrorResponse(400, sprintf('The provided type (%s) does not mach the destination resource types (%s).', $resource_identifier['type'], $target_identifier['type']), $response);
       }
 
+      // Test POST: duplicate targets, no arity.
+      $request_options[RequestOptions::BODY] = Json::encode(['data' => [$target_identifier, $target_identifier]]);
+      $response = $this->request('POST', $url, $request_options);
+      $this->assertResourceErrorResponse(400, 'Duplicate relationships are not permitted. Use `meta.arity` to distinguish resource identifiers with matching `type` and `id` values.', $response);
+
+      // Test PATCH: duplicate targets, no arity.
+      $request_options[RequestOptions::BODY] = Json::encode(['data' => [$target_identifier, $target_identifier]]);
+      $response = $this->request('PATCH', $url, $request_options);
+      $this->assertResourceErrorResponse(400, 'Duplicate relationships are not permitted. Use `meta.arity` to distinguish resource identifiers with matching `type` and `id` values.', $response);
+
       // Test POST: success.
       $request_options[RequestOptions::BODY] = Json::encode(['data' => [$target_identifier]]);
       $response = $this->request('POST', $url, $request_options);
-      $resource->set($relationship_field_name, [$target_resource]);
       $this->assertResourceResponse(204, NULL, $response);
 
-      // @todo: Uncomment the following two assertions in https://www.drupal.org/project/jsonapi/issues/2977659.
       // Test POST: success, relationship already exists, no arity.
-      // @codingStandardsIgnoreStart
-      /*
       $response = $this->request('POST', $url, $request_options);
       $this->assertResourceResponse(204, NULL, $response);
-      */
-      // @codingStandardsIgnoreEnd
 
-      // Test PATCH: success, new value is the same as existing value.
-      $request_options[RequestOptions::BODY] = Json::encode(['data' => [$target_identifier]]);
-      $response = $this->request('PATCH', $url, $request_options);
-      $resource->set($relationship_field_name, [$target_resource]);
-      $this->assertResourceResponse(204, NULL, $response);
-
-      // Test POST: success, relationship already exists, with unique arity.
-      $request_options[RequestOptions::BODY] = Json::encode([
-        'data' => [
-          $target_identifier + ['meta' => ['arity' => 1]],
-        ],
-      ]);
+      // Test POST: success, relationship already exists, new arity.
+      $request_options[RequestOptions::BODY] = Json::encode(['data' => [$target_identifier + ['meta' => ['arity' => 1]]]]);
       $response = $this->request('POST', $url, $request_options);
       $resource->set($relationship_field_name, [$target_resource, $target_resource]);
       $expected_document = $this->getExpectedGetRelationshipDocument($relationship_field_name, $resource);
       $expected_document['data'][0] += ['meta' => ['arity' => 0]];
       $expected_document['data'][1] += ['meta' => ['arity' => 1]];
+      $this->assertResourceResponse(200, $expected_document, $response);
+
+      // Test PATCH: success, new value is the same as given value.
+      $request_options[RequestOptions::BODY] = Json::encode([
+        'data' => [
+          $target_identifier + ['meta' => ['arity' => 0]],
+          $target_identifier + ['meta' => ['arity' => 1]],
+        ],
+      ]);
+      $response = $this->request('PATCH', $url, $request_options);
+      $this->assertResourceResponse(204, NULL, $response);
+
+      // Test POST: success, relationship already exists, new arity.
+      $request_options[RequestOptions::BODY] = Json::encode([
+        'data' => [
+          $target_identifier + ['meta' => ['arity' => 2]],
+        ],
+      ]);
+      $response = $this->request('POST', $url, $request_options);
+      $resource->set($relationship_field_name, [
+        $target_resource,
+        $target_resource,
+        $target_resource,
+      ]);
+      $expected_document = $this->getExpectedGetRelationshipDocument($relationship_field_name, $resource);
+      $expected_document['data'][0] += ['meta' => ['arity' => 0]];
+      $expected_document['data'][1] += ['meta' => ['arity' => 1]];
+      $expected_document['data'][2] += ['meta' => ['arity' => 2]];
       // 200 with response body because the request did not include the
       // existing relationship resource identifier object.
       $this->assertResourceResponse(200, $expected_document, $response);
 
-      // @todo: Uncomment the following block in https://www.drupal.org/project/jsonapi/issues/2977659.
-      // @codingStandardsIgnoreStart
-      //// Test DELETE: two existing relationships, one removed.
-      //$request_options[RequestOptions::BODY] = Json::encode(['data' => [
-      //  $target_identifier + ['meta' => ['arity' => 0]],
-      //]]);
-      //$response = $this->request('DELETE', $url, $request_options);
-      //// @todo Remove 3 lines below in favor of commented line in https://www.drupal.org/project/jsonapi/issues/2977653.
-      //$resource->set($relationship_field_name, [$target_resource]);
-      //$expected_document = $this->getExpectedGetRelationshipDocument($relationship_field_name, $resource);
-      //$this->assertResourceResponse(201, $expected_document, $response);
-      //// $this->assertResourceResponse(204, NULL, $response);
-      //$resource->set($relationship_field_name, [$target_resource]);
-      //$expected_document = $this->getExpectedGetRelationshipDocument($relationship_field_name, $resource);
-      //$response = $this->request('GET', $url, $request_options);
-      //$this->assertSameDocument($expected_document, Json::decode((string) $response->getBody()));
-      // @codingStandardsIgnoreEnd
+      // Test POST: success.
+      $request_options[RequestOptions::BODY] = Json::encode([
+        'data' => [
+          $target_identifier + ['meta' => ['arity' => 0]],
+          $target_identifier + ['meta' => ['arity' => 1]],
+        ],
+      ]);
+      $response = $this->request('POST', $url, $request_options);
+      // 200 with response body because the request did not include the
+      // resource identifier with arity 2.
+      $this->assertResourceResponse(200, $expected_document, $response);
+
+      // Test PATCH: success.
+      $request_options[RequestOptions::BODY] = Json::encode([
+        'data' => [
+          $target_identifier + ['meta' => ['arity' => 0]],
+          $target_identifier + ['meta' => ['arity' => 1]],
+          $target_identifier + ['meta' => ['arity' => 2]],
+        ],
+      ]);
+      $response = $this->request('PATCH', $url, $request_options);
+      // 204 no content. PATCH data matches existing data.
+      $this->assertResourceResponse(204, NULL, $response);
+
+      // Test DELETE: three existing relationships, two removed.
+      $request_options[RequestOptions::BODY] = Json::encode([
+        'data' => [
+          $target_identifier + ['meta' => ['arity' => 0]],
+          $target_identifier + ['meta' => ['arity' => 2]],
+        ],
+      ]);
+      $response = $this->request('DELETE', $url, $request_options);
+      $this->assertResourceResponse(204, NULL, $response);
+      // Subsequent GET should return only one resource identifier, with no
+      // arity.
+      $resource->set($relationship_field_name, [$target_resource]);
+      $expected_document = $this->getExpectedGetRelationshipDocument($relationship_field_name, $resource);
+      $response = $this->request('GET', $url, $request_options);
+      $this->assertSameDocument($expected_document, Json::decode((string) $response->getBody()));
 
       // Test DELETE: one existing relationship, removed.
       $request_options[RequestOptions::BODY] = Json::encode(['data' => [$target_identifier]]);
@@ -1539,13 +1583,21 @@ abstract class ResourceTestBase extends BrowserTestBase {
       $this->assertSameDocument($expected_document, Json::decode((string) $response->getBody()));
 
       // Test PATCH: success, new value is different than existing value.
-      $request_options[RequestOptions::BODY] = Json::encode(['data' => [$target_identifier, $target_identifier]]);
+      $request_options[RequestOptions::BODY] = Json::encode([
+        'data' => [
+          $target_identifier + ['meta' => ['arity' => 2]],
+          $target_identifier + ['meta' => ['arity' => 3]],
+        ],
+      ]);
       $response = $this->request('PATCH', $url, $request_options);
       $resource->set($relationship_field_name, [$target_resource, $target_resource]);
       $expected_document = $this->getExpectedGetRelationshipDocument($relationship_field_name, $resource);
       $expected_document['data'][0] += ['meta' => ['arity' => 0]];
       $expected_document['data'][1] += ['meta' => ['arity' => 1]];
-      $this->assertResourceResponse(204, NULL, $response);
+      // 200 with response body because arity values are computed; that means
+      // that the PATCH arity values 2 + 3 will become 0 + 1 if there are not
+      // already resource identifiers with those arity values.
+      $this->assertResourceResponse(200, $expected_document, $response);
 
       // Test DELETE: two existing relationships, both removed because no arity
       // was specified.

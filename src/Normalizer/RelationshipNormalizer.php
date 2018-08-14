@@ -6,7 +6,7 @@ use Drupal\Core\Access\AccessResult;
 use Drupal\Core\Entity\EntityFieldManagerInterface;
 use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Entity\EntityRepositoryInterface;
-use Drupal\Core\Field\FieldTypePluginManagerInterface;
+use Drupal\jsonapi\JsonApiResource\ResourceIdentifier;
 use Drupal\jsonapi\Normalizer\Value\RelationshipNormalizerValue;
 use Drupal\jsonapi\ResourceType\ResourceType;
 use Drupal\jsonapi\ResourceType\ResourceTypeRepositoryInterface;
@@ -39,6 +39,13 @@ class RelationshipNormalizer extends NormalizerBase implements DenormalizerInter
   protected $formats = ['api_json'];
 
   /**
+   * The JSON API resource type repository.
+   *
+   * @var \Drupal\jsonapi\ResourceType\ResourceTypeRepositoryInterface
+   */
+  protected $resourceTypeRepository;
+
+  /**
    * The link manager.
    *
    * @var \Drupal\jsonapi\LinkManager\LinkManager
@@ -51,13 +58,6 @@ class RelationshipNormalizer extends NormalizerBase implements DenormalizerInter
    * @var \Drupal\Core\Entity\EntityFieldManagerInterface
    */
   protected $fieldManager;
-
-  /**
-   * The field plugin manager.
-   *
-   * @var \Drupal\Core\Field\FieldTypePluginManagerInterface
-   */
-  protected $pluginManager;
 
   /**
    * The entity repository.
@@ -75,17 +75,13 @@ class RelationshipNormalizer extends NormalizerBase implements DenormalizerInter
    *   The link manager.
    * @param \Drupal\Core\Entity\EntityFieldManagerInterface $field_manager
    *   The entity field manager.
-   * @param \Drupal\Core\Field\FieldTypePluginManagerInterface $plugin_manager
-   *   The plugin manager for field types.
    * @param \Drupal\Core\Entity\EntityRepositoryInterface $entity_repository
    *   The entity repository.
    */
-  public function __construct(ResourceTypeRepositoryInterface $resource_type_repository, LinkManager $link_manager, EntityFieldManagerInterface $field_manager, FieldTypePluginManagerInterface $plugin_manager, EntityRepositoryInterface $entity_repository) {
+  public function __construct(ResourceTypeRepositoryInterface $resource_type_repository, LinkManager $link_manager, EntityFieldManagerInterface $field_manager, EntityRepositoryInterface $entity_repository) {
     $this->resourceTypeRepository = $resource_type_repository;
     $this->linkManager = $link_manager;
     $this->fieldManager = $field_manager;
-    $this->resourceTypeRepository = $resource_type_repository;
-    $this->pluginManager = $plugin_manager;
     $this->entityRepository = $entity_repository;
   }
 
@@ -116,7 +112,7 @@ class RelationshipNormalizer extends NormalizerBase implements DenormalizerInter
 
     $is_multiple = $field_definition->getFieldStorageDefinition()->isMultiple();
     $data = $this->massageRelationshipInput($data, $is_multiple);
-    $values = array_map(function ($value) use ($property_key, $target_resource_type_names) {
+    $resource_identifiers = array_map(function ($value) use ($property_key, $target_resource_type_names) {
       // Make sure that the provided type is compatible with the targeted
       // resource.
       if (!in_array($value['type'], $target_resource_type_names)) {
@@ -126,24 +122,12 @@ class RelationshipNormalizer extends NormalizerBase implements DenormalizerInter
           implode(', ', $target_resource_type_names)
         ));
       }
-
-      // Load the entity by UUID.
-      list($entity_type_id,) = explode('--', $value['type']);
-      $entity = $this->entityRepository->loadEntityByUuid($entity_type_id, $value['id']);
-      $value['id'] = $entity ? $entity->id() : NULL;
-
-      $properties = [$property_key => $value['id']];
-      // Also take into account additional properties provided by the field
-      // type.
-      if (!empty($value['meta'])) {
-        foreach ($value['meta'] as $meta_key => $meta_value) {
-          $properties[$meta_key] = $meta_value;
-        }
-      }
-      return $properties;
+      return new ResourceIdentifier($value['type'], $value['id'], isset($value['meta']) ? $value['meta'] : []);
     }, $data['data']);
-    return $this->pluginManager
-      ->createFieldItemList($context['target_entity'], $context['related'], $values);
+    if (!ResourceIdentifier::areResourceIdentifiersUnique($resource_identifiers)) {
+      throw new BadRequestHttpException('Duplicate relationships are not permitted. Use `meta.arity` to distinguish resource identifiers with matching `type` and `id` values.');
+    }
+    return $resource_identifiers;
   }
 
   /**

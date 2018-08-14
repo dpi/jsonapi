@@ -62,7 +62,7 @@ services:
       - { name: jsonapi_normalizer_do_not_use_removal_imminent }
   serializer.normalizer.relationship.jsonapi:
     class: Drupal\jsonapi\Normalizer\RelationshipNormalizer
-    arguments: ['@jsonapi.resource_type.repository', '@jsonapi.link_manager', '@entity_field.manager', '@plugin.manager.field.field_type', '@entity.repository']
+    arguments: ['@jsonapi.resource_type.repository', '@jsonapi.link_manager', '@entity_field.manager', '@entity.repository']
     tags:
       - { name: jsonapi_normalizer_do_not_use_removal_imminent }
   serializer.normalizer.entity.jsonapi:
@@ -157,10 +157,10 @@ services:
     arguments:
       - '@entity_type.manager'
       - '@entity_field.manager'
-      - '@plugin.manager.field.field_type'
       - '@jsonapi.link_manager'
       - '@jsonapi.resource_type.repository'
       - '@renderer'
+      - '@entity.repository'
 
   # Event subscribers.
   jsonapi.custom_query_parameter_names_validator.subscriber:

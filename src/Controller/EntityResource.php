@@ -8,16 +8,17 @@ use Drupal\Core\Config\Entity\ConfigEntityInterface;
 use Drupal\Core\Entity\ContentEntityInterface;
 use Drupal\Core\Entity\EntityFieldManagerInterface;
 use Drupal\Core\Entity\EntityInterface;
+use Drupal\Core\Entity\EntityRepositoryInterface;
 use Drupal\Core\Entity\EntityStorageInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Entity\FieldableEntityInterface;
-use Drupal\Core\Field\EntityReferenceFieldItemListInterface;
+use Drupal\Core\Field\FieldDefinitionInterface;
 use Drupal\Core\Field\FieldItemListInterface;
-use Drupal\Core\Field\FieldTypePluginManagerInterface;
 use Drupal\Core\Render\RenderContext;
 use Drupal\Core\Render\RendererInterface;
 use Drupal\jsonapi\Exception\EntityAccessDeniedHttpException;
 use Drupal\jsonapi\Exception\UnprocessableHttpEntityException;
+use Drupal\jsonapi\JsonApiResource\ResourceIdentifier;
 use Drupal\jsonapi\LabelOnlyEntity;
 use Drupal\jsonapi\Query\Filter;
 use Drupal\jsonapi\Query\Sort;
@@ -29,7 +30,6 @@ use Drupal\jsonapi\ResourceResponse;
 use Drupal\jsonapi\ResourceType\ResourceType;
 use Drupal\jsonapi\ResourceType\ResourceTypeRepositoryInterface;
 use Symfony\Component\HttpFoundation\Request;
-use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
 use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 
@@ -56,13 +56,6 @@ class EntityResource {
   protected $fieldManager;
 
   /**
-   * The current context service.
-   *
-   * @var \Drupal\Core\Field\FieldTypePluginManagerInterface
-   */
-  protected $pluginManager;
-
-  /**
    * The link manager service.
    *
    * @var \Drupal\jsonapi\LinkManager\LinkManager
@@ -84,28 +77,35 @@ class EntityResource {
   protected $renderer;
 
   /**
+   * The entity repository.
+   *
+   * @var \Drupal\Core\Entity\EntityRepositoryInterface
+   */
+  protected $entityRepository;
+
+  /**
    * Instantiates a EntityResource object.
    *
    * @param \Drupal\Core\Entity\EntityTypeManagerInterface $entity_type_manager
    *   The entity type manager.
    * @param \Drupal\Core\Entity\EntityFieldManagerInterface $field_manager
    *   The entity type field manager.
-   * @param \Drupal\Core\Field\FieldTypePluginManagerInterface $plugin_manager
-   *   The plugin manager for fields.
    * @param \Drupal\jsonapi\LinkManager\LinkManager $link_manager
    *   The link manager service.
    * @param \Drupal\jsonapi\ResourceType\ResourceTypeRepositoryInterface $resource_type_repository
    *   The link manager service.
    * @param \Drupal\Core\Render\RendererInterface $renderer
    *   The renderer.
+   * @param \Drupal\Core\Entity\EntityRepositoryInterface $entity_repository
+   *   The entity repository.
    */
-  public function __construct(EntityTypeManagerInterface $entity_type_manager, EntityFieldManagerInterface $field_manager, FieldTypePluginManagerInterface $plugin_manager, LinkManager $link_manager, ResourceTypeRepositoryInterface $resource_type_repository, RendererInterface $renderer) {
+  public function __construct(EntityTypeManagerInterface $entity_type_manager, EntityFieldManagerInterface $field_manager, LinkManager $link_manager, ResourceTypeRepositoryInterface $resource_type_repository, RendererInterface $renderer, EntityRepositoryInterface $entity_repository) {
     $this->entityTypeManager = $entity_type_manager;
     $this->fieldManager = $field_manager;
-    $this->pluginManager = $plugin_manager;
     $this->linkManager = $link_manager;
     $this->resourceTypeRepository = $resource_type_repository;
     $this->renderer = $renderer;
+    $this->entityRepository = $entity_repository;
   }
 
   /**
@@ -115,8 +115,6 @@ class EntityResource {
    *   The base JSON API resource type for the request to be served.
    * @param \Drupal\Core\Entity\EntityInterface $entity
    *   The loaded entity.
-   * @param \Symfony\Component\HttpFoundation\Request $request
-   *   The request object.
    *
    * @return \Drupal\jsonapi\ResourceResponse
    *   The response.
@@ -467,13 +465,12 @@ class EntityResource {
    *
    * @param \Drupal\jsonapi\ResourceType\ResourceType $resource_type
    *   The base JSON API resource type for the request to be served.
-   * @param \Drupal\Core\Entity\EntityInterface $entity
+   * @param \Drupal\Core\Entity\FieldableEntityInterface $entity
    *   The requested entity.
    * @param string $related_field
    *   The related field name.
-   * @param mixed $parsed_field_list
-   *   The entity reference field list of items to add, or a response object in
-   *   case of error.
+   * @param \Drupal\jsonapi\JsonApiResource\ResourceIdentifier[] $resource_identifiers
+   *   The received resource identifiers.
    * @param \Symfony\Component\HttpFoundation\Request $request
    *   The request object.
    *
@@ -485,79 +482,50 @@ class EntityResource {
    *   field(s).
    * @throws \Symfony\Component\HttpKernel\Exception\ConflictHttpException
    *   Thrown when POSTing to a "to-one" relationship.
+   * @throws \Drupal\Core\Entity\EntityStorageException
+   *   Thrown when the underlying entity cannot be saved.
    */
-  public function createRelationship(ResourceType $resource_type, EntityInterface $entity, $related_field, $parsed_field_list, Request $request) {
+  public function addToRelationshipData(ResourceType $resource_type, FieldableEntityInterface $entity, $related_field, array $resource_identifiers, Request $request) {
     $related_field = $resource_type->getInternalName($related_field);
-    /* @var \Drupal\Core\Field\EntityReferenceFieldItemListInterface $parsed_field_list */
-    if ($parsed_field_list instanceof Response) {
-      // This usually means that there was an error, so there is no point on
-      // processing further.
-      return $parsed_field_list;
-    }
     // According to the specification, you are only allowed to POST to a
     // relationship if it is a to-many relationship.
     /* @var \Drupal\Core\Field\EntityReferenceFieldItemListInterface $field_list */
     $field_list = $entity->{$related_field};
-    $is_multiple = $field_list->getFieldDefinition()
-      ->getFieldStorageDefinition()
-      ->isMultiple();
+    /* @var \Drupal\field\Entity\FieldConfig $field_definition */
+    $field_definition = $field_list->getFieldDefinition();
+    $is_multiple = $field_definition->getFieldStorageDefinition()->isMultiple();
     if (!$is_multiple) {
       throw new ConflictHttpException(sprintf('You can only POST to to-many relationships. %s is a to-one relationship.', $related_field));
     }
 
-    $original_field_list = clone $field_list;
-    // Time to save the relationship.
-    foreach ($parsed_field_list as $field_item) {
-      $field_list->appendItem($field_item->getValue());
+    $original_resource_identifiers = ResourceIdentifier::toResourceIdentifiers($field_list);
+    $new_resource_identifiers = array_udiff(
+      ResourceIdentifier::deduplicate(array_merge($original_resource_identifiers, $resource_identifiers)),
+      $original_resource_identifiers,
+      [ResourceIdentifier::class, 'compare']
+    );
+
+    // There are no relationships that need to be added so we can exit early.
+    if (empty($new_resource_identifiers)) {
+      $status = static::relationshipResponseRequiresBody($resource_identifiers, $original_resource_identifiers) ? 200 : 204;
+      return $this->getRelationship($resource_type, $entity, $related_field, $request, $status);
     }
+
+    $main_property_name = $field_definition->getItemDefinition()->getMainPropertyName();
+    foreach ($new_resource_identifiers as $new_resource_identifier) {
+      $new_field_value = [$main_property_name => $this->getEntityFromResourceIdentifier($new_resource_identifier)->id()];
+      // Remove `arity` from the received extra properties, otherwise this
+      // will fail field validation.
+      $new_field_value += array_diff_key($new_resource_identifier->getMeta(), array_flip([ResourceIdentifier::ARITY_KEY]));
+      $field_list->appendItem($new_field_value);
+    }
+
     $this->validate($entity);
     $entity->save();
-    $status = static::relationshipArityIsAffected($original_field_list, $field_list)
-      ? 200
-      : 204;
+
+    $final_resource_identifiers = ResourceIdentifier::toResourceIdentifiers($field_list);
+    $status = static::relationshipResponseRequiresBody($resource_identifiers, $final_resource_identifiers) ? 200 : 204;
     return $this->getRelationship($resource_type, $entity, $related_field, $request, $status);
-  }
-
-  /**
-   * Checks whether relationship arity is affected.
-   *
-   * @param \Drupal\Core\Field\EntityReferenceFieldItemListInterface $old
-   *   The old (stored) entity references.
-   * @param \Drupal\Core\Field\EntityReferenceFieldItemListInterface $new
-   *   The new (updated) entity references.
-   *
-   * @return bool
-   *   Whether entities already being referenced now have additional references.
-   *
-   * @see \Drupal\jsonapi\Normalizer\Value\RelationshipNormalizerValue::ensureUniqueResourceIdentifierObjects()
-   */
-  protected static function relationshipArityIsAffected(EntityReferenceFieldItemListInterface $old, EntityReferenceFieldItemListInterface $new) {
-    $old_targets = static::toTargets($old);
-    $new_targets = static::toTargets($new);
-    $relationship_count_changed = count($old_targets) !== count($new_targets);
-    $existing_relationships_updated = !empty(array_unique(array_intersect($old_targets, $new_targets)));
-    return $relationship_count_changed && $existing_relationships_updated;
-  }
-
-  /**
-   * Maps a list of entity reference field objects to a list of targets.
-   *
-   * @param \Drupal\Core\Field\EntityReferenceFieldItemListInterface $relationship_list
-   *   A list of entity reference field objects.
-   *
-   * @return string[]|int[]
-   *   A list of targets.
-   */
-  protected static function toTargets(EntityReferenceFieldItemListInterface $relationship_list) {
-    $main_property_name = $relationship_list->getFieldDefinition()
-      ->getFieldStorageDefinition()
-      ->getMainPropertyName();
-
-    $values = [];
-    foreach ($relationship_list->getIterator() as $relationship) {
-      $values[] = $relationship->getValue()[$main_property_name];
-    }
-    return $values;
   }
 
   /**
@@ -569,35 +537,33 @@ class EntityResource {
    *   The requested entity.
    * @param string $related_field
    *   The related field name.
-   * @param mixed $parsed_field_list
-   *   The entity reference field list of items to add, or a response object in
-   *   case of error.
+   * @param \Drupal\jsonapi\JsonApiResource\ResourceIdentifier[] $resource_identifiers
+   *   The client-sent resource identifiers which should be set on the given
+   *   entity.
    * @param \Symfony\Component\HttpFoundation\Request $request
    *   The request object.
    *
    * @return \Drupal\jsonapi\ResourceResponse
    *   The response.
+   *
+   * @throws \Drupal\Core\Entity\EntityStorageException
+   *   Thrown when the underlying entity cannot be saved.
    */
-  public function patchRelationship(ResourceType $resource_type, EntityInterface $entity, $related_field, $parsed_field_list, Request $request) {
+  public function replaceRelationshipData(ResourceType $resource_type, EntityInterface $entity, $related_field, array $resource_identifiers, Request $request) {
     $related_field = $resource_type->getInternalName($related_field);
-    if ($parsed_field_list instanceof Response) {
-      // This usually means that there was an error, so there is no point on
-      // processing further.
-      return $parsed_field_list;
-    }
-    /* @var \Drupal\Core\Field\EntityReferenceFieldItemListInterface $parsed_field_list */
+    /* @var \Drupal\Core\Field\EntityReferenceFieldItemListInterface $resource_identifiers */
     // According to the specification, PATCH works a little bit different if the
     // relationship is to-one or to-many.
     /* @var \Drupal\Core\Field\EntityReferenceFieldItemListInterface $field_list */
     $field_list = $entity->{$related_field};
-    $is_multiple = $field_list->getFieldDefinition()
-      ->getFieldStorageDefinition()
-      ->isMultiple();
+    $field_definition = $field_list->getFieldDefinition();
+    $is_multiple = $field_definition->getFieldStorageDefinition()->isMultiple();
     $method = $is_multiple ? 'doPatchMultipleRelationship' : 'doPatchIndividualRelationship';
-    $this->{$method}($entity, $parsed_field_list);
+    $this->{$method}($entity, $resource_identifiers, $field_definition);
     $this->validate($entity);
     $entity->save();
-    return $this->getRelationship($resource_type, $entity, $related_field, $request, 204);
+    $requires_response = static::relationshipResponseRequiresBody($resource_identifiers, ResourceIdentifier::toResourceIdentifiers($field_list));
+    return $this->getRelationship($resource_type, $entity, $related_field, $request, $requires_response ? 200 : 204);
   }
 
   /**
@@ -605,18 +571,20 @@ class EntityResource {
    *
    * @param \Drupal\Core\Entity\EntityInterface $entity
    *   The requested entity.
-   * @param \Drupal\Core\Field\EntityReferenceFieldItemListInterface $parsed_field_list
-   *   The entity reference field list of items to add, or a response object in
-   *   case of error.
+   * @param \Drupal\jsonapi\JsonApiResource\ResourceIdentifier[] $resource_identifiers
+   *   The client-sent resource identifiers which should be set on the given
+   *   entity. Should be an empty array or an array with a single value.
+   * @param \Drupal\Core\Field\FieldDefinitionInterface $field_definition
+   *   The field definition of the entity field to be updated.
    *
    * @throws \Symfony\Component\HttpKernel\Exception\BadRequestHttpException
    *   Thrown when a "to-one" relationship is not provided.
    */
-  protected function doPatchIndividualRelationship(EntityInterface $entity, EntityReferenceFieldItemListInterface $parsed_field_list) {
-    if ($parsed_field_list->count() > 1) {
-      throw new BadRequestHttpException(sprintf('Provide a single relationship so to-one relationship fields (%s).', $parsed_field_list->getName()));
+  protected function doPatchIndividualRelationship(EntityInterface $entity, array $resource_identifiers, FieldDefinitionInterface $field_definition) {
+    if (count($resource_identifiers) > 1) {
+      throw new BadRequestHttpException(sprintf('Provide a single relationship so to-one relationship fields (%s).', $field_definition->getName()));
     }
-    $this->doPatchMultipleRelationship($entity, $parsed_field_list);
+    $this->doPatchMultipleRelationship($entity, $resource_identifiers, $field_definition);
   }
 
   /**
@@ -624,20 +592,21 @@ class EntityResource {
    *
    * @param \Drupal\Core\Entity\EntityInterface $entity
    *   The requested entity.
-   * @param \Drupal\Core\Field\EntityReferenceFieldItemListInterface $parsed_field_list
-   *   The entity reference field list of items to add, or a response object in
-   *   case of error.
-   *
-   * @throws \Drupal\jsonapi\Exception\EntityAccessDeniedHttpException
-   *   Thrown when the current user is not allow to PATCH the selected field.
+   * @param \Drupal\jsonapi\JsonApiResource\ResourceIdentifier[] $resource_identifiers
+   *   The client-sent resource identifiers which should be set on the given
+   *   entity.
+   * @param \Drupal\Core\Field\FieldDefinitionInterface $field_definition
+   *   The field definition of the entity field to be updated.
    */
-  protected function doPatchMultipleRelationship(EntityInterface $entity, EntityReferenceFieldItemListInterface $parsed_field_list) {
-    $field_name = $parsed_field_list->getName();
-    $field_access = $parsed_field_list->access('edit', NULL, TRUE);
-    if (!$field_access->isAllowed()) {
-      throw new EntityAccessDeniedHttpException($entity, $field_access, '/data/relationships/' . $field_name, sprintf('The current user is not allowed to PATCH the selected field (%s).', $field_name));
-    }
-    $entity->{$field_name} = $parsed_field_list;
+  protected function doPatchMultipleRelationship(EntityInterface $entity, array $resource_identifiers, FieldDefinitionInterface $field_definition) {
+    $main_property_name = $field_definition->getItemDefinition()->getMainPropertyName();
+    $entity->{$field_definition->getName()} = array_map(function (ResourceIdentifier $resource_identifier) use ($main_property_name) {
+      $field_properties = [$main_property_name => $this->getEntityFromResourceIdentifier($resource_identifier)->id()];
+      // Remove `arity` from the received extra properties, otherwise this
+      // will fail field validation.
+      $field_properties += array_diff_key($resource_identifier->getMeta(), array_flip([ResourceIdentifier::ARITY_KEY]));
+      return $field_properties;
+    }, $resource_identifiers);
   }
 
   /**
@@ -649,9 +618,9 @@ class EntityResource {
    *   The requested entity.
    * @param string $related_field
    *   The related field name.
-   * @param mixed $parsed_field_list
-   *   The entity reference field list of items to add, or a response object in
-   *   case of error.
+   * @param \Drupal\jsonapi\JsonApiResource\ResourceIdentifier[]|\Symfony\Component\HttpFoundation\Request $resource_identifiers
+   *   The client-sent resource identifiers which should be removed from the
+   *   relationship, if they exist.
    * @param \Symfony\Component\HttpFoundation\Request $request
    *   The request object.
    *
@@ -662,14 +631,13 @@ class EntityResource {
    *   Thrown when not body was provided for the DELETE operation.
    * @throws \Symfony\Component\HttpKernel\Exception\ConflictHttpException
    *   Thrown when deleting a "to-one" relationship.
+   * @throws \Drupal\Core\Entity\EntityStorageException
+   *   Thrown when the underlying entity cannot be saved.
+   *
+   * @todo: add `array` type hint to $resource_identifiers in https://www.drupal.org/project/jsonapi/issues/2987610
    */
-  public function deleteRelationship(ResourceType $resource_type, EntityInterface $entity, $related_field, $parsed_field_list, Request $request = NULL) {
-    if ($parsed_field_list instanceof Response) {
-      // This usually means that there was an error, so there is no point on
-      // processing further.
-      return $parsed_field_list;
-    }
-    if ($parsed_field_list instanceof Request) {
+  public function removeFromRelationshipData(ResourceType $resource_type, EntityInterface $entity, $related_field, $resource_identifiers, Request $request = NULL) {
+    if ($resource_identifiers instanceof Request) {
       // This usually means that there was not body provided.
       throw new BadRequestHttpException(sprintf('You need to provide a body for DELETE operations on a relationship (%s).', $related_field));
     }
@@ -683,14 +651,24 @@ class EntityResource {
     }
 
     // Compute the list of current values and remove the ones in the payload.
-    $current_values = $field_list->getValue();
-    $deleted_values = $parsed_field_list->getValue();
-    $keep_values = array_udiff($current_values, $deleted_values, function ($first, $second) {
-      return reset($first) - reset($second);
-    });
-    // Replace the existing field with one containing the relationships to keep.
-    $entity->{$related_field} = $this->pluginManager
-      ->createFieldItemList($entity, $related_field, $keep_values);
+    $original_resource_identifiers = ResourceIdentifier::toResourceIdentifiers($field_list);
+    $removed_resource_identifiers = array_uintersect($resource_identifiers, $original_resource_identifiers, [ResourceIdentifier::class, 'compare']);
+    $deltas_to_be_removed = [];
+    foreach ($removed_resource_identifiers as $removed_resource_identifier) {
+      foreach ($original_resource_identifiers as $delta => $existing_resource_identifier) {
+        // Identify the field item deltas which should be removed.
+        if (ResourceIdentifier::isDuplicate($removed_resource_identifier, $existing_resource_identifier)) {
+          $deltas_to_be_removed[] = $delta;
+        }
+      }
+    }
+    // Field item deltas are reset when an item is removed. This removes
+    // items in descending order so that the deltas yet to be removed will
+    // continue to exist.
+    rsort($deltas_to_be_removed);
+    foreach ($deltas_to_be_removed as $delta) {
+      $field_list->removeItem($delta);
+    }
 
     // Save the entity and return the response object.
     $this->validate($entity);
@@ -769,6 +747,48 @@ class EntityResource {
   protected function getCollectionCountQuery(ResourceType $resource_type, array $params) {
     // Reset the range to get all the available results.
     return $this->getCollectionQuery($resource_type, $params)->range()->count();
+  }
+
+  /**
+   * Loads the entity targeted by a resource identifier.
+   *
+   * @param \Drupal\jsonapi\JsonApiResource\ResourceIdentifier $resource_identifier
+   *   A resource identifier.
+   *
+   * @return \Drupal\Core\Entity\EntityInterface
+   *   The entity targeted by a resource identifier.
+   *
+   * @throws \Symfony\Component\HttpKernel\Exception\BadRequestHttpException
+   *   Thrown if the given resource identifier targets a resource type or
+   *   resource which does not exist.
+   */
+  protected function getEntityFromResourceIdentifier(ResourceIdentifier $resource_identifier) {
+    $resource_type_name = $resource_identifier->getTypeName();
+    if (!($target_resource_type = $this->resourceTypeRepository->getByTypeName($resource_type_name))) {
+      throw new BadRequestHttpException("The resource type `{$resource_type_name}` does not exist.");
+    }
+    $id = $resource_identifier->getId();
+    if (!($targeted_resource = $this->entityRepository->loadEntityByUuid($target_resource_type->getEntityTypeId(), $id))) {
+      throw new BadRequestHttpException("The targeted `{$resource_type_name}` resource with ID `{$id}` does not exist.");
+    }
+    return $targeted_resource;
+  }
+
+  /**
+   * Determines if the client needs to be updated with new relationship data.
+   *
+   * @param array $received_resource_identifiers
+   *   The array of resource identifiers given by the client.
+   * @param array $final_resource_identifiers
+   *   The final array of resource identifiers after applying the requested
+   *   changes.
+   *
+   * @return bool
+   *   Whether the final array of resource identifiers is different than the
+   *   client-sent data.
+   */
+  protected static function relationshipResponseRequiresBody(array $received_resource_identifiers, array $final_resource_identifiers) {
+    return !empty(array_udiff($final_resource_identifiers, $received_resource_identifiers, [ResourceIdentifier::class, 'compare']));
   }
 
   /**

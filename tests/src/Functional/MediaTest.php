@@ -341,9 +341,9 @@ class MediaTest extends ResourceTestBase {
    *
    * @todo Remove this in https://www.drupal.org/node/2824851.
    */
-  protected function doTestRelationshipPost(array $request_options) {
+  protected function doTestRelationshipMutation(array $request_options) {
     $this->grantPermissionsToTestedRole(['access content']);
-    parent::doTestRelationshipPost($request_options);
+    parent::doTestRelationshipMutation($request_options);
   }
 
 }

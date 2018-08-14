@@ -4,9 +4,11 @@ namespace Drupal\Tests\jsonapi\Kernel\Controller;
 
 use Drupal\Component\Serialization\Json;
 use Drupal\Core\Config\ConfigException;
+use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Field\EntityReferenceFieldItemListInterface;
 use Drupal\Core\Field\FieldStorageDefinitionInterface;
 use Drupal\jsonapi\Exception\EntityAccessDeniedHttpException;
+use Drupal\jsonapi\JsonApiResource\ResourceIdentifier;
 use Drupal\jsonapi\ResourceType\ResourceType;
 use Drupal\jsonapi\Controller\EntityResource;
 use Drupal\jsonapi\JsonApiResource\EntityCollection;
@@ -34,6 +36,13 @@ use Symfony\Component\HttpKernel\Exception\HttpException;
  * @internal
  */
 class EntityResourceTest extends JsonapiKernelTestBase {
+
+  const NODE_UUID = [
+    1 => '83bc47ad-2c58-45e3-9136-abcdef111111',
+    2 => '83bc47ad-2c58-45e3-9136-abcdef222222',
+    3 => '83bc47ad-2c58-45e3-9136-abcdef333333',
+    4 => '83bc47ad-2c58-45e3-9136-abcdef444444',
+  ];
 
   /**
    * {@inheritdoc}
@@ -121,6 +130,7 @@ class EntityResourceTest extends JsonapiKernelTestBase {
       'title' => 'dummy_title',
       'type' => 'article',
       'uid' => $this->user->id(),
+      'uuid' => static::NODE_UUID[1],
     ]);
     $this->node->save();
 
@@ -128,6 +138,7 @@ class EntityResourceTest extends JsonapiKernelTestBase {
       'type' => 'article',
       'title' => 'Another test node',
       'uid' => $this->user->id(),
+      'uuid' => static::NODE_UUID[2],
     ]);
     $this->node2->save();
 
@@ -136,6 +147,7 @@ class EntityResourceTest extends JsonapiKernelTestBase {
       'title' => 'Unpublished test node',
       'uid' => $this->user->id(),
       'status' => 0,
+      'uuid' => static::NODE_UUID[3],
     ]);
     $this->node3->save();
 
@@ -148,6 +160,7 @@ class EntityResourceTest extends JsonapiKernelTestBase {
         ['target_id' => $this->node2->id()],
         ['target_id' => $this->node3->id()],
       ],
+      'uuid' => static::NODE_UUID[4],
     ]);
     $this->node4->save();
 
@@ -166,10 +179,10 @@ class EntityResourceTest extends JsonapiKernelTestBase {
     $this->entityResource = new EntityResource(
       $this->container->get('entity_type.manager'),
       $this->container->get('entity_field.manager'),
-      $this->container->get('plugin.manager.field.field_type'),
       $this->container->get('jsonapi.link_manager'),
       $this->container->get('jsonapi.resource_type.repository'),
-      $this->container->get('renderer')
+      $this->container->get('renderer'),
+      $this->container->get('entity.repository')
     );
   }
 
@@ -240,10 +253,10 @@ class EntityResourceTest extends JsonapiKernelTestBase {
     $entity_resource = new EntityResource(
       $this->container->get('entity_type.manager'),
       $this->container->get('entity_field.manager'),
-      $this->container->get('plugin.manager.field.field_type'),
       $this->container->get('jsonapi.link_manager'),
       $this->container->get('jsonapi.resource_type.repository'),
-      $this->container->get('renderer')
+      $this->container->get('renderer'),
+      $this->container->get('entity.repository')
     );
 
     // Get the response.
@@ -280,10 +293,10 @@ class EntityResourceTest extends JsonapiKernelTestBase {
     $entity_resource = new EntityResource(
       $this->container->get('entity_type.manager'),
       $this->container->get('entity_field.manager'),
-      $this->container->get('plugin.manager.field.field_type'),
       $this->container->get('jsonapi.link_manager'),
       $this->container->get('jsonapi.resource_type.repository'),
-      $this->container->get('renderer')
+      $this->container->get('renderer'),
+      $this->container->get('entity.repository')
     );
 
     // Get the response.
@@ -322,10 +335,10 @@ class EntityResourceTest extends JsonapiKernelTestBase {
     $entity_resource = new EntityResource(
       $this->container->get('entity_type.manager'),
       $this->container->get('entity_field.manager'),
-      $this->container->get('plugin.manager.field.field_type'),
       $this->container->get('jsonapi.link_manager'),
       $this->container->get('jsonapi.resource_type.repository'),
-      $this->container->get('renderer')
+      $this->container->get('renderer'),
+      $this->container->get('entity.repository')
     );
 
     // Get the response.
@@ -689,14 +702,10 @@ class EntityResourceTest extends JsonapiKernelTestBase {
   }
 
   /**
-   * @covers ::createRelationship
+   * @covers ::addToRelationshipData
    */
-  public function testCreateRelationship() {
-    $parsed_field_list = $this->container
-      ->get('plugin.manager.field.field_type')
-      ->createFieldItemList($this->node, 'field_relationships', [
-        ['target_id' => $this->node->id()],
-      ]);
+  public function testAddToRelationshipData() {
+    $resource_identifiers = [new ResourceIdentifier('node--article', $this->node->uuid())];
     Role::load(Role::ANONYMOUS_ID)
       ->grantPermission('edit any article content')
       ->save();
@@ -705,7 +714,7 @@ class EntityResourceTest extends JsonapiKernelTestBase {
     $resource_type->setRelatableResourceTypes([
       'field_relationships' => [new ResourceType('node', 'article', NULL)],
     ]);
-    $response = $this->entityResource->createRelationship($resource_type, $this->node, 'field_relationships', $parsed_field_list, new Request());
+    $response = $this->entityResource->addToRelationshipData($resource_type, $this->node, 'field_relationships', $resource_identifiers, new Request());
 
     // As a side effect, the node will also be saved.
     $this->assertNotEmpty($this->node->id());
@@ -718,15 +727,12 @@ class EntityResourceTest extends JsonapiKernelTestBase {
   }
 
   /**
-   * @covers ::patchRelationship
-   * @dataProvider patchRelationshipProvider
+   * @covers ::replaceRelationshipData
+   * @dataProvider replaceRelationshipDataProvider
    */
-  public function testPatchRelationship($relationships) {
+  public function testReplaceRelationshipData($relationships) {
     $this->node->field_relationships->appendItem(['target_id' => $this->node->id()]);
     $this->node->save();
-    $parsed_field_list = $this->container
-      ->get('plugin.manager.field.field_type')
-      ->createFieldItemList($this->node, 'field_relationships', $relationships);
     Role::load(Role::ANONYMOUS_ID)
       ->grantPermission('edit any article content')
       ->save();
@@ -735,7 +741,7 @@ class EntityResourceTest extends JsonapiKernelTestBase {
     $resource_type->setRelatableResourceTypes([
       'field_relationships' => [new ResourceType('node', 'article', NULL)],
     ]);
-    $response = $this->entityResource->patchRelationship($resource_type, $this->node, 'field_relationships', $parsed_field_list, new Request());
+    $response = $this->entityResource->replaceRelationshipData($resource_type, $this->node, 'field_relationships', $relationships, new Request());
 
     // As a side effect, the node will also be saved.
     $this->assertNotEmpty($this->node->id());
@@ -743,7 +749,14 @@ class EntityResourceTest extends JsonapiKernelTestBase {
     $field_list = $response->getResponseData()->getData();
     $this->assertInstanceOf(EntityReferenceFieldItemListInterface::class, $field_list);
     $this->assertSame('field_relationships', $field_list->getName());
-    $this->assertEquals($relationships, $field_list->getValue());
+    $this->assertEquals(
+      array_map(function (ResourceIdentifier $identifier) {
+        return $identifier->getId();
+      }, $relationships),
+      array_map(function (EntityInterface $entity) {
+        return $entity->uuid();
+      }, $field_list->referencedEntities())
+    );
     $this->assertEquals(204, $response->getStatusCode());
   }
 
@@ -753,26 +766,28 @@ class EntityResourceTest extends JsonapiKernelTestBase {
    * @return array
    *   The input data for the test function.
    */
-  public function patchRelationshipProvider() {
+  public function replaceRelationshipDataProvider() {
     return [
       // Replace relationships.
-      [[['target_id' => 2], ['target_id' => 1]]],
+      [
+        [
+          new ResourceIdentifier('node--article', static::NODE_UUID[1]),
+          new ResourceIdentifier('node--article', static::NODE_UUID[2]),
+        ],
+      ],
       // Remove relationships.
       [[]],
     ];
   }
 
   /**
-   * @covers ::deleteRelationship
-   * @dataProvider deleteRelationshipProvider
+   * @covers ::removeFromRelationshipData
+   * @dataProvider removeFromRelationshipDataProvider
    */
-  public function testDeleteRelationship($deleted_rels, $kept_rels) {
+  public function testRemoveFromRelationshipData($deleted_rels, $kept_rels) {
     $this->node->field_relationships->appendItem(['target_id' => $this->node->id()]);
     $this->node->field_relationships->appendItem(['target_id' => $this->node2->id()]);
     $this->node->save();
-    $parsed_field_list = $this->container
-      ->get('plugin.manager.field.field_type')
-      ->createFieldItemList($this->node, 'field_relationships', $deleted_rels);
     Role::load(Role::ANONYMOUS_ID)
       ->grantPermission('edit any article content')
       ->save();
@@ -781,7 +796,7 @@ class EntityResourceTest extends JsonapiKernelTestBase {
     $resource_type->setRelatableResourceTypes([
       'field_relationships' => [new ResourceType('node', 'article', NULL)],
     ]);
-    $response = $this->entityResource->deleteRelationship($resource_type, $this->node, 'field_relationships', $parsed_field_list, new Request());
+    $response = $this->entityResource->removeFromRelationshipData($resource_type, $this->node, 'field_relationships', $deleted_rels, new Request());
 
     // As a side effect, the node will also be saved.
     $this->assertInstanceOf(JsonApiDocumentTopLevel::class, $response->getResponseData());
@@ -798,12 +813,23 @@ class EntityResourceTest extends JsonapiKernelTestBase {
    * @return array
    *   The input data for the test function.
    */
-  public function deleteRelationshipProvider() {
+  public function removeFromRelationshipDataProvider() {
     return [
       // Remove one relationship.
-      [[['target_id' => 1]], [['target_id' => 2]]],
+      [
+        [
+          new ResourceIdentifier('node--article', static::NODE_UUID[1]),
+        ],
+        [['target_id' => 2]],
+      ],
       // Remove all relationships.
-      [[['target_id' => 2], ['target_id' => 1]], []],
+      [
+        [
+          new ResourceIdentifier('node--article', static::NODE_UUID[2]),
+          new ResourceIdentifier('node--article', static::NODE_UUID[1]),
+        ],
+        [],
+      ],
       // Remove no relationship.
       [[], [['target_id' => 1], ['target_id' => 2]]],
     ];

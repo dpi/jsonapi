@@ -73,7 +73,7 @@ class RequestHandler {
     $action = $this->action($request, $resource_type);
 
     // Only add the unserialized data if there is something there.
-    $extra_parameters = $unserialized ? [$unserialized, $request] : [$request];
+    $extra_parameters = !is_null($unserialized) ? [$unserialized, $request] : [$request];
 
     return call_user_func_array([$this->entityResource, $action], array_merge($parameters, $extra_parameters));
   }
@@ -165,13 +165,13 @@ class RequestHandler {
         return $request->get($resource_type->getEntityTypeId()) ? 'getIndividual' : 'getCollection';
 
       case 'post':
-        return ($on_relationship) ? 'createRelationship' : 'createIndividual';
+        return ($on_relationship) ? 'addToRelationshipData' : 'createIndividual';
 
       case 'patch':
-        return ($on_relationship) ? 'patchRelationship' : 'patchIndividual';
+        return ($on_relationship) ? 'replaceRelationshipData' : 'patchIndividual';
 
       case 'delete':
-        return ($on_relationship) ? 'deleteRelationship' : 'deleteIndividual';
+        return ($on_relationship) ? 'removeFromRelationshipData' : 'deleteIndividual';
     }
   }
 
