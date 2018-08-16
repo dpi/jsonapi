@@ -1071,11 +1071,10 @@ abstract class ResourceTestBase extends BrowserTestBase {
     $message = 'The "' . static::$entityTypeId . '" parameter was not converted for the path "' . $path . '" (route name: "jsonapi.' . static::$resourceTypeName . '.individual")';
     $this->assertResourceErrorResponse(404, $message, $response, FALSE, ['4xx-response', 'http_response'], [''], FALSE, 'UNCACHEABLE');
 
-    // DX: when Accept request header is missing, still 404, but HTML response.
+    // DX: when Accept request header is missing, still 404, same response.
     unset($request_options[RequestOptions::HEADERS]['Accept']);
     $response = $this->request('GET', $url, $request_options);
-    $this->assertSame(404, $response->getStatusCode());
-    $this->assertSame(['text/html; charset=UTF-8'], $response->getHeader('Content-Type'));
+    $this->assertResourceErrorResponse(404, $message, $response, FALSE, ['4xx-response', 'http_response'], [''], FALSE, 'UNCACHEABLE');
   }
 
   /**
@@ -1413,7 +1412,7 @@ abstract class ResourceTestBase extends BrowserTestBase {
 
     // Test POST: missing content-type.
     $response = $this->request('POST', $url, $request_options);
-    $this->assertResourceErrorResponse(415, 'No "Content-Type" request header specified', $response);
+    $this->assertSame(415, $response->getStatusCode());
 
     // Set the JSON API media type header for all subsequent requests.
     $request_options[RequestOptions::HEADERS]['Content-Type'] = 'application/vnd.api+json';
@@ -1883,7 +1882,7 @@ abstract class ResourceTestBase extends BrowserTestBase {
 
     // DX: 415 when no Content-Type request header.
     $response = $this->request('POST', $url, $request_options);
-    $this->assertResourceErrorResponse(415, 'No "Content-Type" request header specified', $response);
+    $this->assertSame(415, $response->getStatusCode());
 
     $request_options[RequestOptions::HEADERS]['Content-Type'] = 'application/vnd.api+json';
 
@@ -2125,7 +2124,7 @@ abstract class ResourceTestBase extends BrowserTestBase {
 
     // DX: 415 when no Content-Type request header.
     $response = $this->request('PATCH', $url, $request_options);
-    $this->assertResourceErrorResponse(415, 'No "Content-Type" request header specified', $response);
+    $this->assertsame(415, $response->getStatusCode());
 
     $request_options[RequestOptions::HEADERS]['Content-Type'] = 'application/vnd.api+json';
 
@@ -2317,7 +2316,7 @@ abstract class ResourceTestBase extends BrowserTestBase {
 
     // DX: 415 when request body in existing but not allowed format.
     $response = $this->request('PATCH', $url, $request_options);
-    $this->assertResourceErrorResponse(415, 'No route found that matches "Content-Type: text/xml"', $response);
+    $this->assertSame(415, $response->getStatusCode());
 
     $request_options[RequestOptions::HEADERS]['Content-Type'] = 'application/vnd.api+json';
 

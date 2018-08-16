@@ -283,9 +283,8 @@ class JsonApiFunctionalTest extends JsonApiFunctionalTestBase {
     // 19. Test non-existing route without 'Accept' header.
     $this->drupalGet('/jsonapi/node/article/broccoli');
     $this->assertSession()->statusCodeEquals(404);
-    // Without the 'Accept' header we cannot know we want the 404 error
-    // formatted as JSON API.
-    $this->assertSession()->responseHeaderContains('Content-Type', 'text/html');
+    // Even without the 'Accept' header the 404 error is formatted as JSON API.
+    $this->assertSession()->responseHeaderEquals('Content-Type', 'application/vnd.api+json');
     // 20. Test non-existing route with 'Accept' header.
     $single_output = Json::decode($this->drupalGet('/jsonapi/node/article/broccoli', [], [
       'Accept' => 'application/vnd.api+json',
@@ -592,11 +591,6 @@ class JsonApiFunctionalTest extends JsonApiFunctionalTestBase {
     ]);
     $created_response = Json::decode($response->getBody()->__toString());
     $this->assertEquals(415, $response->getStatusCode());
-    $this->assertNotEmpty($created_response['errors']);
-    $this->assertEquals(
-      'Unsupported Media Type',
-      $created_response['errors'][0]['title']
-    );
 
     // 4. Article with a duplicate ID.
     $invalid_body = $body;

@@ -100,16 +100,14 @@ class InternalEntitiesTest extends BrowserTestBase {
     // This cannot be in a data provider because it needs values created by the
     // setUp method.
     $paths = [
-      'individual' => $this->getIndividual($this->internalEntity),
-      'collection' => $this->jsonapiGet("/jsonapi/{$this->internalEntity->getEntityTypeId()}/{$this->internalEntity->bundle()}"),
-      'related' => $this->getRelated($this->referencingEntity, 'field_internal'),
+      'individual' => "/jsonapi/entity_test_no_label/entity_test_no_label/{$this->internalEntity->uuid()}",
+      'collection' => "/jsonapi/entity_test_no_label/entity_test_no_label",
+      'related' => "/jsonapi/entity_test_no_label/entity_test_no_label/{$this->internalEntity->uuid()}/field_internal",
     ];
-    foreach ($paths as $type => $document) {
-      $this->assertSame(
-        404,
-        $document['errors'][0]['status'],
-        "The '{$type}' route should not be available for internal resource types.'"
-      );
+    $this->drupalLogin($this->testUser);
+    foreach ($paths as $type => $path) {
+      $this->drupalGet($path, ['Accept' => 'application/vnd.api+json']);
+      $this->assertSame(404, $this->getSession()->getStatusCode());
     }
   }
 
