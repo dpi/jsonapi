@@ -43,21 +43,24 @@ trait ResourceResponseTestTrait {
     assert(count($responses) > 0);
     $merged_document = [];
     $merged_cacheability = new CacheableMetadata();
+    $omitted = $errors = [];
     foreach ($responses as $response) {
       $response_document = $response->getResponseData();
-      $merge_errors = function ($errors) use (&$merged_document, $is_multiple) {
-        foreach ($errors as $error) {
-          $merged_document['meta']['errors'][] = $error;
-        }
-      };
       // If any of the response documents had top-level or meta errors, we
       // should later expect the merged document to have all these errors
-      // under the 'meta' member.
+      // omitted yet linked under the 'meta' member.
       if (!empty($response_document['errors'])) {
-        $merge_errors($response_document['errors']);
+        $errors = array_merge($errors, $response_document['errors']);
       }
-      if (!empty($response_document['meta']['errors'])) {
-        $merge_errors($response_document['meta']['errors']);
+      if (!empty($response_document['meta']['omitted']['links'])) {
+        if (!empty($omitted)) {
+          foreach ($response_document['meta']['omitted']['links'] as $key => $link) {
+            $omitted['links'][$key] = $link;
+          }
+        }
+        else {
+          $omitted = $response_document['meta']['omitted'];
+        }
       }
       elseif (isset($response_document['data'])) {
         $response_data = $response_document['data'];
@@ -85,6 +88,22 @@ trait ResourceResponseTestTrait {
       ],
       'version' => '1.0',
     ];
+    if (!empty($omitted)) {
+      $merged_document['meta']['omitted'] = $omitted;
+    }
+    if (!empty($errors)) {
+      $merged_document['meta']['omitted']['detail'] = 'Some resources have been omitted because of insufficient authorization.';
+      $merged_document['meta']['omitted']['links']['help'] = 'https://www.drupal.org/docs/8/modules/json-api/filtering#filters-access-control';
+      foreach ($errors as $index => $error) {
+        $merged_document['meta']['omitted']['links']['item:' . md5((string) $index)] = [
+          'href' => $error['links']['via'],
+          'meta' => [
+            'rel' => 'item',
+            'detail' => $error['detail'],
+          ],
+        ];
+      }
+    }
     // Until we can reasonably know what caused an error, we shouldn't include
     // 'self' links in error documents. For example, a 404 shouldn't have a
     // 'self' link because HATEOAS links shouldn't point to resources which do
@@ -119,13 +138,18 @@ trait ResourceResponseTestTrait {
   protected function getExpectedIncludedResourceResponse(array $include_paths, array $request_options) {
     $resource_data = array_reduce($include_paths, function ($data, $path) use ($request_options) {
       $field_names = explode('.', $path);
+      /* @var \Drupal\Core\Entity\EntityInterface $entity */
       $entity = $this->entity;
       foreach ($field_names as $public_field_name) {
         $field_name = $this->resourceType->getInternalName($public_field_name);
         $collected_responses = [];
+        $via_link = Url::fromRoute(
+          sprintf('jsonapi.%s.%s.related', $entity->getEntityTypeId() . '--' . $entity->bundle(), $public_field_name),
+          [$entity->getEntityTypeId() => $entity->uuid()]
+        );
         $field_access = static::entityFieldAccess($entity, $field_name, 'view', $this->account);
         if (!$field_access->isAllowed()) {
-          $collected_responses[] = static::getAccessDeniedResponse($entity, $field_access, $field_name, 'The current user is not allowed to view this relationship.');
+          $collected_responses[] = static::getAccessDeniedResponse($entity, $field_access, $via_link, $field_name, 'The current user is not allowed to view this relationship.', $field_name);
           break;
         }
         if ($target_entity = $entity->{$field_name}->entity) {
@@ -137,9 +161,7 @@ trait ResourceResponseTestTrait {
             $resource_identifier = static::toResourceIdentifier($target_entity);
             if (!static::collectionHasResourceIdentifier($resource_identifier, $data['already_checked'])) {
               $data['already_checked'][] = $resource_identifier;
-              // @todo remove this in https://www.drupal.org/project/jsonapi/issues/2943176
-              $error_id = '/' . $resource_identifier['type'] . '/' . $resource_identifier['id'];
-              $collected_responses[] = static::getAccessDeniedResponse($entity, $target_access, NULL, NULL, '/data', $error_id);
+              $collected_responses[] = static::getAccessDeniedResponse($entity, $target_access, $via_link, NULL, NULL, '/data');
             }
             break;
           }
@@ -435,6 +457,8 @@ trait ResourceResponseTestTrait {
    *   The entity for which to generate the forbidden response.
    * @param \Drupal\Core\Access\AccessResultInterface $access
    *   The denied AccessResult. This can carry a reason and cacheability data.
+   * @param \Drupal\Core\Url $via_link
+   *   The source URL for the errors of the response.
    * @param string|null $relationship_field_name
    *   (optional) The field name to which the forbidden result applies. Useful
    *   for testing related/relationship routes and includes.
@@ -443,18 +467,15 @@ trait ResourceResponseTestTrait {
    * @param string|bool|null $pointer
    *   (optional) Document pointer for the JSON API error object. FALSE to omit
    *   the pointer.
-   * @param string|null $id
-   *   (optional) ID for the JSON API error object.
    *
    * @return \Drupal\jsonapi\ResourceResponse
    *   The forbidden ResourceResponse.
    */
-  protected static function getAccessDeniedResponse(EntityInterface $entity, AccessResultInterface $access, $relationship_field_name = NULL, $detail = NULL, $pointer = NULL, $id = NULL) {
+  protected static function getAccessDeniedResponse(EntityInterface $entity, AccessResultInterface $access, Url $via_link, $relationship_field_name = NULL, $detail = NULL, $pointer = NULL) {
     $detail = ($detail) ? $detail : 'The current user is not allowed to GET the selected resource.';
     if ($access instanceof AccessResultReasonInterface && ($reason = $access->getReason())) {
       $detail .= ' ' . $reason;
     }
-    $resource_identifier = static::toResourceIdentifier($entity);
     $error = [
       'status' => 403,
       'title' => 'Forbidden',
@@ -463,14 +484,12 @@ trait ResourceResponseTestTrait {
         'info' => HttpExceptionNormalizer::getInfoUrl(403),
       ],
       'code' => 0,
-      // @todo uncomment in https://www.drupal.org/project/jsonapi/issues/2943176
-      /* 'id' => '/' . $resource_identifier['type'] . '/' . $resource_identifier['id'], */
     ];
-    if (!is_null($id)) {
-      $error['id'] = $id;
-    }
     if ($pointer || $pointer !== FALSE && $relationship_field_name) {
       $error['source']['pointer'] = ($pointer) ? $pointer : $relationship_field_name;
+    }
+    if ($via_link) {
+      $error['links']['via'] = $via_link->setAbsolute()->toString();
     }
 
     return (new ResourceResponse([

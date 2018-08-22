@@ -315,7 +315,7 @@ class CommentTest extends ResourceTestBase {
     $request_options[RequestOptions::BODY] = Json::encode($remove_field($this->getPostDocument(), 'attributes',  'entity_type'));
     $response = $this->request('POST', $url, $request_options);
     // @todo Uncomment, remove next line in https://www.drupal.org/node/2820364.
-    $this->assertResourceErrorResponse(500, 'The "" entity type does not exist.', $response);
+    $this->assertResourceErrorResponse(500, 'The "" entity type does not exist.', $url, $response, FALSE);
     // $this->assertResourceErrorResponse(422, 'Unprocessable Entity', 'entity_type: This value should not be null.', $response);
 
     // DX: 422 when missing 'entity_id' field.
@@ -338,7 +338,7 @@ class CommentTest extends ResourceTestBase {
     $request_options[RequestOptions::BODY] = Json::encode($remove_field($this->getPostDocument(), 'attributes', 'field_name'));
     $response = $this->request('POST', $url, $request_options);
     // @todo Uncomment, remove next line in https://www.drupal.org/node/2820364.
-    $this->assertResourceErrorResponse(500, 'Field  is unknown.', $response);
+    $this->assertResourceErrorResponse(500, 'Field  is unknown.', $url, $response, FALSE);
     // $this->assertResourceErrorResponse(422, 'Unprocessable Entity', 'field_name: This value should not be null.', $response);
     // @codingStandardsIgnoreEnd
   }

@@ -216,6 +216,12 @@ class JsonApiDocumentTopLevelNormalizerValue implements ValueExtractorInterface,
       }
     }
 
+    if (!empty($rasterized['meta']['errors'])) {
+      $omitted = $this->mapErrorsToOmittedItems($rasterized['meta']['errors']);
+      unset($rasterized['meta']['errors']);
+      $rasterized['meta']['omitted'] = $omitted;
+    }
+
     if (empty($rasterized['links'])) {
       unset($rasterized['links']);
     }
@@ -259,6 +265,42 @@ class JsonApiDocumentTopLevelNormalizerValue implements ValueExtractorInterface,
     return array_map(function ($include) {
       return $include->rasterizeValue();
     }, $this->getIncludes());
+  }
+
+  /**
+   * Maps `meta.errors` objects into a `meta.omitted` member.
+   *
+   * @param array $errors
+   *   The original errors.
+   *
+   * @return array
+   *   An omitted object to be added to a document.
+   *
+   * @todo: remove this in https://www.drupal.org/project/jsonapi/issues/2994480. This is a temporary measure to stabilize the 2.x HTTP API for errors.
+   */
+  protected function mapErrorsToOmittedItems(array $errors) {
+    $omitted = [
+      'detail' => 'Some resources have been omitted because of insufficient authorization.',
+      'links' => [
+        'help' => 'https://www.drupal.org/docs/8/modules/json-api/filtering#filters-access-control',
+      ],
+    ];
+    foreach ($errors as $error) {
+      // JSON API links cannot be arrays and the spec generally favors a link
+      // relation types as keys. 'item' is the right link relation type, but we
+      // need multiple values. So, we're just generating a meaningless, random
+      // value to use as a unique key. We don't use the UUID directly so as not
+      // to imply that it's an identifier for the error.
+      $link_key = 'item:' . substr(str_replace('-', '', \Drupal::service('uuid')->generate()), 0, 7);
+      $omitted['links'][$link_key] = [
+        'href' => $error['links']['via'],
+        'meta' => [
+          'rel' => 'item',
+          'detail' => $error['detail'],
+        ],
+      ];
+    }
+    return $omitted;
   }
 
 }

@@ -75,7 +75,6 @@ class JsonApiFunctionalTest extends JsonApiFunctionalTestBase {
     $single_output = Json::decode($this->drupalGet('/jsonapi/node/article/' . $this->nodes[60]->uuid()));
     $this->assertSession()->statusCodeEquals(403);
     $this->assertEquals('/data', $single_output['errors'][0]['source']['pointer']);
-    $this->assertEquals('/node--article/' . $this->nodes[60]->uuid(), $single_output['errors'][0]['id']);
     $this->drupalLogout();
 
     // 6. Single relationship item.
@@ -172,10 +171,12 @@ class JsonApiFunctionalTest extends JsonApiFunctionalTestBase {
     ]));
     $this->assertSession()->statusCodeEquals(200);
     $this->assertEquals(1, count($single_output['data']));
-    $this->assertEquals(1, count($single_output['meta']['errors']));
-    $this->assertEquals(403, $single_output['meta']['errors'][0]['status']);
-    $this->assertEquals('/node--article/' . $this->nodes[1]->uuid(), $single_output['meta']['errors'][0]['id']);
-    $this->assertFalse(empty($single_output['meta']['errors'][0]['source']['pointer']));
+    $this->assertEquals(1, count(array_filter($single_output['meta']['omitted']['links'], function ($key) {
+      return $key !== 'help';
+    }, ARRAY_FILTER_USE_KEY)));
+    $link_keys = array_keys($single_output['meta']['omitted']['links']);
+    $this->assertSame('help', reset($link_keys));
+    $this->assertRegExp('/^item:[a-zA-Z0-9]{7}$/', next($link_keys));
     $this->nodes[1]->set('status', TRUE);
     $this->nodes[1]->save();
     // 13. Test filtering when using short syntax.
@@ -343,7 +344,7 @@ class JsonApiFunctionalTest extends JsonApiFunctionalTestBase {
       return $result['id'];
     }, $output['data']);
     $this->assertCount(5, $output_uuids);
-    $this->assertCount(1, $output['meta']['errors']);
+    $this->assertCount(2, $output['meta']['omitted']['links']);
     $this->assertSame([
       Node::load(60)->uuid(),
       Node::load(59)->uuid(),
@@ -362,7 +363,7 @@ class JsonApiFunctionalTest extends JsonApiFunctionalTestBase {
       return $result['id'];
     }, $output['data']);
     $this->assertCount(5, $output_uuids);
-    $this->assertCount(1, $output['meta']['errors']);
+    $this->assertCount(2, $output['meta']['omitted']['links']);
     $this->assertSame([
       Node::load(56)->uuid(),
       Node::load(57)->uuid(),

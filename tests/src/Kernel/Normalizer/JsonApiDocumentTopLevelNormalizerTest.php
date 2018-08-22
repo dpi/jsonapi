@@ -392,7 +392,10 @@ class JsonApiDocumentTopLevelNormalizerTest extends JsonapiKernelTestBase {
     $this->assertArrayNotHasKey('data', $normalized);
     $this->assertEquals(400, $normalized['errors'][0]['status']);
     $this->assertEquals('Lorem', $normalized['errors'][0]['detail']);
-    $this->assertEquals(['info' => 'http://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html#sec10.4.1'], $normalized['errors'][0]['links']);
+    $this->assertEquals([
+      'info' => 'http://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html#sec10.4.1',
+      'via' => 'http://localhost/',
+    ], $normalized['errors'][0]['links']);
   }
 
   /**

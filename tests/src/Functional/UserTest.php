@@ -301,9 +301,9 @@ class UserTest extends ResourceTestBase {
           'detail' => 'The current user is not allowed to PATCH the selected field (name).',
           'links' => [
             'info' => HttpExceptionNormalizer::getInfoUrl(403),
+            'via' => $url->setAbsolute()->toString(),
           ],
           'code' => 0,
-          'id' => '/user--user/' . $this->account->uuid(),
           'source' => [
             'pointer' => '/data/attributes/name',
           ],
@@ -382,6 +382,7 @@ class UserTest extends ResourceTestBase {
           'detail' => 'The current user is not allowed to PATCH the selected field (uid). The entity ID cannot be changed',
           'links' => [
             'info' => HttpExceptionNormalizer::getInfoUrl(403),
+            'via' => $url->setAbsolute()->toString(),
           ],
           'code' => 0,
           'id' => '/user--user/' . $this->account->uuid(),
@@ -465,7 +466,7 @@ class UserTest extends ResourceTestBase {
     $request_options = NestedArray::mergeDeep($request_options, $this->getAuthenticationRequestOptions());
 
     $response = $this->request('GET', $collection_url, $request_options);
-    $this->assertResourceErrorResponse(400, "Filtering on config entities is not supported by Drupal's entity API. You tried to filter on a Role config entity.", $response, FALSE, ['4xx-response', 'http_response'], [''], FALSE, 'UNCACHEABLE');
+    $this->assertResourceErrorResponse(400, "Filtering on config entities is not supported by Drupal's entity API. You tried to filter on a Role config entity.", $collection_url, $response, FALSE, ['4xx-response', 'http_response'], [''], FALSE, 'UNCACHEABLE');
   }
 
   /**

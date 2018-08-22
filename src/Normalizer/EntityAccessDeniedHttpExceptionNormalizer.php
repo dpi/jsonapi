@@ -2,6 +2,7 @@
 
 namespace Drupal\jsonapi\Normalizer;
 
+use Drupal\Core\Url;
 use Drupal\jsonapi\Exception\EntityAccessDeniedHttpException;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 
@@ -37,12 +38,13 @@ class EntityAccessDeniedHttpExceptionNormalizer extends HttpExceptionNormalizer 
       $reason = $error['reason'];
 
       if (isset($entity)) {
-        $errors[0]['id'] = sprintf(
-          '/%s--%s/%s',
-          $entity->getEntityTypeId(),
-          $entity->bundle(),
-          $entity->uuid()
-        );
+        $entity_type_id = $entity->getEntityTypeId();
+        $bundle = $entity->bundle();
+        $url = Url::fromRoute(
+          sprintf('jsonapi.%s.individual', \Drupal::service('jsonapi.resource_type.repository')->get($entity_type_id, $bundle)->getTypeName()),
+          [$entity_type_id => $entity->uuid()]
+        )->setAbsolute()->toString(TRUE);
+        $errors[0]['links']['via'] = $url->getGeneratedUrl();
       }
       $errors[0]['source']['pointer'] = $pointer;
 

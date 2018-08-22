@@ -83,6 +83,7 @@ class HttpExceptionNormalizer extends NormalizerBase {
       'status' => $status_code,
       'detail' => $exception->getMessage(),
     ];
+    $error['links']['via'] = \Drupal::request()->getUri();
     // Provide an "info" link by default: if the exception carries a single
     // "Link" header, use that, otherwise fall back to the HTTP spec section
     // covering the exception's status code.

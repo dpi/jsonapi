@@ -258,9 +258,9 @@ class NodeTest extends ResourceTestBase {
           'detail' => "The current user is not allowed to PATCH the selected field (path). The following permissions are required: 'create url aliases' OR 'administer url aliases'.",
           'links' => [
             'info' => HttpExceptionNormalizer::getInfoUrl(403),
+            'via' => $url->setAbsolute()->toString(),
           ],
           'code' => 0,
-          'id' => '/node--camelids/' . $this->entity->uuid(),
           'source' => [
             'pointer' => '/data/attributes/path',
           ],
@@ -306,9 +306,9 @@ class NodeTest extends ResourceTestBase {
           'detail' => 'The current user is not allowed to GET the selected resource.',
           'links' => [
             'info' => HttpExceptionNormalizer::getInfoUrl(403),
+            'via' => $url->setAbsolute()->toString(),
           ],
           'code' => 0,
-          'id' => '/node--camelids/' . $this->entity->uuid(),
           'source' => [
             'pointer' => '/data',
           ],
