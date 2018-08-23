@@ -109,7 +109,7 @@ services:
       - { name: route_enhancer }
   jsonapi.link_manager:
     class: Drupal\jsonapi\LinkManager\LinkManager
-    arguments: ['@router.no_access_checks', '@url_generator']
+    arguments: ['@url_generator']
   jsonapi.field_resolver:
     class: Drupal\jsonapi\Context\FieldResolver
     arguments: ['@entity_type.manager', '@entity_field.manager', '@entity_type.bundle.info', '@jsonapi.resource_type.repository']

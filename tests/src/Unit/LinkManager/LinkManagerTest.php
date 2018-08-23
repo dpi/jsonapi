@@ -35,10 +35,9 @@ class LinkManagerTest extends UnitTestCase {
    */
   protected function setUp() {
     parent::setUp();
-    $router = $this->prophesize(ChainRouterInterface::class);
     $url_generator = $this->prophesize(UrlGeneratorInterface::class);
     $url_generator->generateFromRoute(Argument::cetera())->willReturnArgument(2);
-    $this->linkManager = new LinkManager($router->reveal(), $url_generator->reveal());
+    $this->linkManager = new LinkManager($url_generator->reveal());
   }
 
   /**

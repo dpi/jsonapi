@@ -29,12 +29,10 @@ class LinkManager {
   /**
    * Instantiates a LinkManager object.
    *
-   * @param \Symfony\Component\Routing\Matcher\RequestMatcherInterface|null $_router
-   *   Unused. Kept for backwards compatibility.
    * @param \Drupal\Core\Routing\UrlGeneratorInterface $url_generator
    *   The Url generator.
    */
-  public function __construct(RequestMatcherInterface $_router = NULL, UrlGeneratorInterface $url_generator) {
+  public function __construct(UrlGeneratorInterface $url_generator) {
     $this->urlGenerator = $url_generator;
   }
 
