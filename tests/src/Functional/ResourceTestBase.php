@@ -795,8 +795,6 @@ abstract class ResourceTestBase extends BrowserTestBase {
     if ($info_url = HttpExceptionNormalizer::getInfoUrl($expected_status_code)) {
       $expected_error['links']['info'] = $info_url;
     }
-    // @todo Remove in https://www.drupal.org/project/jsonapi/issues/2934362.
-    $expected_error['code'] = 0;
     if ($pointer !== FALSE) {
       $expected_error['source']['pointer'] = $pointer;
     }
@@ -919,7 +917,6 @@ abstract class ResourceTestBase extends BrowserTestBase {
               'info' => HttpExceptionNormalizer::getInfoUrl(403),
               'via' => $url->setAbsolute()->toString(),
             ],
-            'code' => 0,
             'source' => [
               'pointer' => '/data',
             ],
@@ -957,7 +954,6 @@ abstract class ResourceTestBase extends BrowserTestBase {
             'info' => 'http://jsonapi.org/format/#query-parameters',
             'via' => $url_reserved_custom_query_parameter->toString(),
           ],
-          'code' => 0,
         ],
       ],
     ];
@@ -1872,7 +1868,6 @@ abstract class ResourceTestBase extends BrowserTestBase {
           'title' => 'Unprocessable Entity',
           'status' => 422,
           'detail' => "$label_field: $label_field_capitalized: this field cannot hold more than 1 values.",
-          'code' => 0,
           'source' => [
             'pointer' => '/data/attributes/' . $label_field,
           ],
@@ -1901,7 +1896,6 @@ abstract class ResourceTestBase extends BrowserTestBase {
               'info' => HttpExceptionNormalizer::getInfoUrl(403),
               'via' => $url->setAbsolute()->toString(),
             ],
-            'code' => 0,
             'source' => [
               'pointer' => '/data/id',
             ],
@@ -2109,7 +2103,6 @@ abstract class ResourceTestBase extends BrowserTestBase {
           'title' => 'Unprocessable Entity',
           'status' => 422,
           'detail' => "$label_field: $label_field_capitalized: this field cannot hold more than 1 values.",
-          'code' => 0,
           'source' => [
             'pointer' => '/data/attributes/' . $label_field,
           ],
@@ -2135,7 +2128,6 @@ abstract class ResourceTestBase extends BrowserTestBase {
             'info' => HttpExceptionNormalizer::getInfoUrl(403),
             'via' => $url->setAbsolute()->toString(),
           ],
-          'code' => 0,
           'source' => [
             'pointer' => '/data/attributes/field_rest_test',
           ],
@@ -2161,7 +2153,6 @@ abstract class ResourceTestBase extends BrowserTestBase {
             'info' => HttpExceptionNormalizer::getInfoUrl(403),
             'via' => $url->setAbsolute()->toString(),
           ],
-          'code' => 0,
           'source' => [
             'pointer' => '/data/attributes/' . $id_field_name,
           ],
@@ -2199,7 +2190,6 @@ abstract class ResourceTestBase extends BrowserTestBase {
             'info' => HttpExceptionNormalizer::getInfoUrl(403),
             'via' => $url->setAbsolute()->toString(),
           ],
-          'code' => 0,
           'source' => [
             'pointer' => '/data/attributes/field_rest_test',
           ],
@@ -2229,7 +2219,6 @@ abstract class ResourceTestBase extends BrowserTestBase {
               'info' => HttpExceptionNormalizer::getInfoUrl(403),
               'via' => $url->setAbsolute()->toString(),
             ],
-            'code' => 0,
             'source' => [
               'pointer' => '/data/attributes/' . $patch_protected_field_name,
             ],

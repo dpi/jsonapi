@@ -260,7 +260,6 @@ class NodeTest extends ResourceTestBase {
             'info' => HttpExceptionNormalizer::getInfoUrl(403),
             'via' => $url->setAbsolute()->toString(),
           ],
-          'code' => 0,
           'source' => [
             'pointer' => '/data/attributes/path',
           ],
@@ -308,7 +307,6 @@ class NodeTest extends ResourceTestBase {
             'info' => HttpExceptionNormalizer::getInfoUrl(403),
             'via' => $url->setAbsolute()->toString(),
           ],
-          'code' => 0,
           'source' => [
             'pointer' => '/data',
           ],

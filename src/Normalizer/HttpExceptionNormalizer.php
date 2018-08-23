@@ -94,7 +94,6 @@ class HttpExceptionNormalizer extends NormalizerBase {
     elseif ($info_url = $this->getInfoUrl($status_code)) {
       $error['links']['info'] = $info_url;
     }
-    $error['code'] = $exception->getCode();
     // Exceptions thrown without an explicitly defined code get assigned zero by
     // default. Since this is no helpful information, omit it.
     if ($exception->getCode() !== 0) {

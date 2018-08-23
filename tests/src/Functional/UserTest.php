@@ -214,7 +214,6 @@ class UserTest extends ResourceTestBase {
           'title' => 'Unprocessable Entity',
           'status' => 422,
           'detail' => 'mail: Your current password is missing or incorrect; it\'s required to change the Email.',
-          'code' => 0,
           'source' => [
             'pointer' => '/data/attributes/mail',
           ],
@@ -255,7 +254,6 @@ class UserTest extends ResourceTestBase {
           'title' => 'Unprocessable Entity',
           'status' => 422,
           'detail' => 'pass: Your current password is missing or incorrect; it\'s required to change the Password.',
-          'code' => 0,
           'source' => [
             'pointer' => '/data/attributes/pass',
           ],
@@ -303,7 +301,6 @@ class UserTest extends ResourceTestBase {
             'info' => HttpExceptionNormalizer::getInfoUrl(403),
             'via' => $url->setAbsolute()->toString(),
           ],
-          'code' => 0,
           'source' => [
             'pointer' => '/data/attributes/name',
           ],
@@ -384,7 +381,6 @@ class UserTest extends ResourceTestBase {
             'info' => HttpExceptionNormalizer::getInfoUrl(403),
             'via' => $url->setAbsolute()->toString(),
           ],
-          'code' => 0,
           'id' => '/user--user/' . $this->account->uuid(),
           'source' => [
             'pointer' => '/data/attributes/uid',

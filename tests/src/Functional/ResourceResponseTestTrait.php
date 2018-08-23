@@ -483,7 +483,6 @@ trait ResourceResponseTestTrait {
       'links' => [
         'info' => HttpExceptionNormalizer::getInfoUrl(403),
       ],
-      'code' => 0,
     ];
     if ($pointer || $pointer !== FALSE && $relationship_field_name) {
       $error['source']['pointer'] = ($pointer) ? $pointer : $relationship_field_name;
