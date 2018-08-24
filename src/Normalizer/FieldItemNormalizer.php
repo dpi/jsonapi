@@ -43,12 +43,14 @@ class FieldItemNormalizer extends NormalizerBase implements DenormalizerInterfac
     $values = [];
     // We normalize each individual property, so each can do their own casting,
     // if needed.
-    $field_item = TypedDataInternalPropertiesHelper::getNonInternalProperties($field_item);
+    $field_properties = !empty($field_item->getProperties(TRUE))
+      ? TypedDataInternalPropertiesHelper::getNonInternalProperties($field_item)
+      : $field_item->getValue();
 
     // @todo Use the constant \Drupal\serialization\Normalizer\CacheableNormalizerInterface::SERIALIZATION_CONTEXT_CACHEABILITY instead of the 'cacheability' string when JSON API requires Drupal 8.5 or newer.
     $context['cacheability'] = new CacheableMetadata();
 
-    foreach ($field_item as $property_name => $property) {
+    foreach ($field_properties as $property_name => $property) {
       $values[$property_name] = $this->serializer->normalize($property, $format, $context);
     }
 
@@ -82,11 +84,16 @@ class FieldItemNormalizer extends NormalizerBase implements DenormalizerInterfac
     }
 
     $data_internal = [];
-    foreach ($data as $property_name => $property_value) {
-      $property_value_class = $property_definitions[$property_name]->getClass();
-      $data_internal[$property_name] = $this->serializer->supportsDenormalization($property_value, $property_value_class, $format, $context)
-        ? $this->serializer->denormalize($property_value, $property_value_class, $format, $context)
-        : $property_value;
+    if (!empty($property_definitions)) {
+      foreach ($data as $property_name => $property_value) {
+        $property_value_class = $property_definitions[$property_name]->getClass();
+        $data_internal[$property_name] = $this->serializer->supportsDenormalization($property_value, $property_value_class, $format, $context)
+          ? $this->serializer->denormalize($property_value, $property_value_class, $format, $context)
+          : $property_value;
+      }
+    }
+    else {
+      $data_internal = $data;
     }
 
     return $data_internal;

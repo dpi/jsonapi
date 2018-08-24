@@ -2269,13 +2269,23 @@ abstract class ResourceTestBase extends BrowserTestBase {
     $updated_entity_document = $this->normalize($updated_entity, $url);
     $this->assertSame($updated_entity_document, Json::decode((string) $response->getBody()));
     // Assert that the entity was indeed created using the PATCHed values.
-    foreach ($this->getPatchDocument() as $field_name => $field_normalization) {
-      // Some top-level keys in the normalization may not be fields on the
-      // entity (for example '_links' and '_embedded' in the HAL normalization).
-      if ($updated_entity->hasField($field_name)) {
-        // Subset, not same, because we can e.g. send just the target_id for the
-        // bundle in a PATCH request; the response will include more properties.
-        $this->assertArraySubset($field_normalization, $updated_entity->get($field_name)->getValue(), TRUE);
+    foreach ($this->getPatchDocument()['data']['attributes'] as $field_name => $field_normalization) {
+      // If the value is an array of properties, only verify that the sent
+      // properties are present, the server could be computing additional
+      // properties.
+      if (is_array($field_normalization)) {
+        $this->assertArraySubset($field_normalization, $updated_entity_document['data']['attributes'][$field_name]);
+      }
+      else {
+        $this->assertSame($field_normalization, $updated_entity_document['data']['attributes'][$field_name]);
+      }
+    }
+    if (isset($this->getPatchDocument()['data']['relationships'])) {
+      foreach ($this->getPatchDocument()['data']['relationships'] as $field_name => $relationship_field_normalization) {
+        // POSTing relationships: 'data' is required, 'links' is optional.
+        static::recursiveKsort($relationship_field_normalization);
+        static::recursiveKsort($updated_entity_document['data']['relationships'][$field_name]);
+        $this->assertSame($relationship_field_normalization, array_diff_key($updated_entity_document['data']['relationships'][$field_name], ['links' => TRUE]));
       }
     }
 
