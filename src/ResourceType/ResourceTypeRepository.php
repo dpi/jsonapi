@@ -108,9 +108,9 @@ class ResourceTypeRepository implements ResourceTypeRepositoryInterface {
             $bundle,
             $entity_type->getClass(),
             $entity_type->isInternal(),
-            static::isLocatableResourceType($entity_type),
-            static::isMutableResourceType($entity_type),
-            static::getFieldMapping($raw_fields, $entity_type)
+            static::isLocatableResourceType($entity_type, $bundle),
+            static::isMutableResourceType($entity_type, $bundle),
+            static::getFieldMapping($raw_fields, $entity_type, $bundle)
           );
         }, array_keys($this->entityTypeBundleInfo->getBundleInfo($entity_type_id))));
       }
@@ -151,12 +151,14 @@ class ResourceTypeRepository implements ResourceTypeRepositoryInterface {
   }
 
   /**
-   * Gets the field mapping for the given field names and entity type.
+   * Gets the field mapping for the given field names and entity type + bundle.
    *
    * @param string[] $field_names
    *   All field names on a bundle of the given entity type.
    * @param \Drupal\Core\Entity\EntityTypeInterface $entity_type
    *   The entity type for which to get the field mapping.
+   * @param string $bundle
+   *   The bundle to assess.
    *
    * @return array
    *   An array with:
@@ -166,9 +168,10 @@ class ResourceTypeRepository implements ResourceTypeRepositoryInterface {
    *     its internal name) or a string (indicating the field should not be
    *     exposed using its internal name, but the name specified in the string)
    */
-  protected static function getFieldMapping(array $field_names, EntityTypeInterface $entity_type) {
+  protected static function getFieldMapping(array $field_names, EntityTypeInterface $entity_type, $bundle) {
     assert(Inspector::assertAllStrings($field_names));
     assert($entity_type instanceof ContentEntityTypeInterface || $entity_type instanceof ConfigEntityTypeInterface);
+    assert(is_string($bundle) && !empty($bundle), 'A bundle ID is required. Bundleless entity types should pass the entity type ID again.');
 
     $mapping = [];
 
@@ -249,28 +252,34 @@ class ResourceTypeRepository implements ResourceTypeRepositoryInterface {
   }
 
   /**
-   * Whether an entity type is a mutable resource type.
+   * Whether an entity type + bundle maps to a mutable resource type.
    *
    * @param \Drupal\Core\Entity\EntityTypeInterface $entity_type
    *   The entity type to assess.
+   * @param string $bundle
+   *   The bundle to assess.
    *
    * @return bool
    *   TRUE if the entity type is mutable, FALSE otherwise.
    */
-  protected static function isMutableResourceType(EntityTypeInterface $entity_type) {
+  protected static function isMutableResourceType(EntityTypeInterface $entity_type, $bundle) {
+    assert(is_string($bundle) && !empty($bundle), 'A bundle ID is required. Bundleless entity types should pass the entity type ID again.');
     return !$entity_type instanceof ConfigEntityTypeInterface;
   }
 
   /**
-   * Whether an entity type is a locatable resource type.
+   * Whether an entity type + bundle maps to a locatable resource type.
    *
    * @param \Drupal\Core\Entity\EntityTypeInterface $entity_type
    *   The entity type to assess.
+   * @param string $bundle
+   *   The bundle to assess.
    *
    * @return bool
    *   TRUE if the entity type is locatable, FALSE otherwise.
    */
-  protected static function isLocatableResourceType(EntityTypeInterface $entity_type) {
+  protected static function isLocatableResourceType(EntityTypeInterface $entity_type, $bundle) {
+    assert(is_string($bundle) && !empty($bundle), 'A bundle ID is required. Bundleless entity types should pass the entity type ID again.');
     return $entity_type->getStorageClass() !== ContentEntityNullStorage::class;
   }
 
