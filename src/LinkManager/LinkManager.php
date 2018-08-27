@@ -2,12 +2,13 @@
 
 namespace Drupal\jsonapi\LinkManager;
 
+use Drupal\Core\Cache\CacheableMetadata;
 use Drupal\Core\Routing\UrlGeneratorInterface;
 use Drupal\Core\Url;
 use Drupal\jsonapi\ResourceType\ResourceType;
 use Drupal\jsonapi\Query\OffsetPage;
 use Symfony\Component\HttpFoundation\Request;
-use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
+use Drupal\Core\Http\Exception\CacheableBadRequestHttpException;
 use Symfony\Component\Routing\Matcher\RequestMatcherInterface;
 
 /**
@@ -117,7 +118,8 @@ class LinkManager {
       $size = OffsetPage::SIZE_MAX;
     }
     if ($size <= 0) {
-      throw new BadRequestHttpException(sprintf('The page size needs to be a positive integer.'));
+      $cacheability = (new CacheableMetadata())->addCacheContexts(['url.query_args:page']);
+      throw new CacheableBadRequestHttpException($cacheability, sprintf('The page size needs to be a positive integer.'));
     }
     $query = (array) $request->query->getIterator();
     $links = [];

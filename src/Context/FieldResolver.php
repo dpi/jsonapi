@@ -2,6 +2,7 @@
 
 namespace Drupal\jsonapi\Context;
 
+use Drupal\Core\Cache\CacheableMetadata;
 use Drupal\Core\Entity\EntityFieldManagerInterface;
 use Drupal\Core\Entity\EntityTypeBundleInfoInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
@@ -13,7 +14,7 @@ use Drupal\Core\TypedData\DataReferenceDefinitionInterface;
 use Drupal\Core\TypedData\DataReferenceTargetDefinition;
 use Drupal\jsonapi\ResourceType\ResourceType;
 use Drupal\jsonapi\ResourceType\ResourceTypeRepositoryInterface;
-use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
+use Drupal\Core\Http\Exception\CacheableBadRequestHttpException;
 
 /**
  * A service that evaluates external path expressions against Drupal fields.
@@ -152,8 +153,9 @@ class FieldResolver {
    *   Thrown if the path contains invalid specifiers.
    */
   public static function resolveInternalIncludePath(ResourceType $resource_type, array $path_parts, $depth = 0) {
+    $cacheability = (new CacheableMetadata())->addCacheContexts(['url.query_args:include']);
     if (empty($path_parts)) {
-      throw new BadRequestHttpException('Empty include path.');
+      throw new CacheableBadRequestHttpException($cacheability, 'Empty include path.');
     }
     $public_field_name = $path_parts[0];
     $internal_field_name = $resource_type->getInternalName($public_field_name);
@@ -163,7 +165,7 @@ class FieldResolver {
       if (!empty(($possible = implode(', ', array_keys($resource_type->getRelatableResourceTypes()))))) {
         $message .= " Possible values: $possible.";
       }
-      throw new BadRequestHttpException($message);
+      throw new CacheableBadRequestHttpException($cacheability, $message);
     }
     $remaining_parts = array_slice($path_parts, 1);
     if (empty($remaining_parts)) {
@@ -177,17 +179,17 @@ class FieldResolver {
         // multiple possible resolutions.
         $resolved += static::resolveInternalIncludePath($relatable_resource_type, $remaining_parts, $depth + 1);
       }
-      catch (BadRequestHttpException $e) {
+      catch (CacheableBadRequestHttpException $e) {
         $exceptions[] = $e;
       }
     }
     if (!empty($exceptions) && count($exceptions) === count($relatable_resource_types)) {
-      $previous_messages = implode(' ', array_unique(array_map(function (BadRequestHttpException $e) {
+      $previous_messages = implode(' ', array_unique(array_map(function (CacheableBadRequestHttpException $e) {
         return $e->getMessage();
       }, $exceptions)));
       // Only add the full include path on the first level of recursion so that
       // the invalid path phrase isn't repeated at every level.
-      throw new BadRequestHttpException($depth === 0
+      throw new CacheableBadRequestHttpException($cacheability, $depth === 0
         ? sprintf("`%s` is not a valid include path. $previous_messages", implode('.', $path_parts))
         : $previous_messages
       );
@@ -233,12 +235,13 @@ class FieldResolver {
    * @return string
    *   The mapped field name.
    *
-   * @throws \Symfony\Component\HttpKernel\Exception\BadRequestHttpException
+   * @throws \Drupal\Core\Http\Exception\CacheableBadRequestHttpException
    */
   public function resolveInternalEntityQueryPath($entity_type_id, $bundle, $external_field_name) {
+    $cacheability = (new CacheableMetadata())->addCacheContexts(['url.query_args:filter', 'url.query_args:sort']);
     $resource_type = $this->resourceTypeRepository->get($entity_type_id, $bundle);
     if (empty($external_field_name)) {
-      throw new BadRequestHttpException('No field name was provided for the filter.');
+      throw new CacheableBadRequestHttpException($cacheability, 'No field name was provided for the filter.');
     }
 
     // Turns 'uid.categories.name' into
@@ -270,7 +273,7 @@ class FieldResolver {
 
       // If there are no definitions, then the field does not exist.
       if (empty($candidate_definitions)) {
-        throw new BadRequestHttpException(sprintf(
+        throw new CacheableBadRequestHttpException($cacheability, sprintf(
           'Invalid nested filtering. The field `%s`, given in the path `%s`, does not exist.',
           $part,
           $external_field_name
@@ -522,7 +525,8 @@ class FieldResolver {
       }, $unique_reference_names);
       // @todo Add test coverage for this in https://www.drupal.org/project/jsonapi/issues/2971281
       $message = sprintf('Ambiguous path. Try one of the following: %s, in place of the given path: %s', implode(', ', $choices), implode('.', $unresolved_path_parts));
-      throw new BadRequestHttpException($message);
+      $cacheability = (new CacheableMetadata())->addCacheContexts(['url.query_args:filter', 'url.query_args:sort']);
+      throw new CacheableBadRequestHttpException($cacheability, $message);
     }
     return $unique_reference_names[0];
   }

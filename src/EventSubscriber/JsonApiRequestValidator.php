@@ -2,11 +2,12 @@
 
 namespace Drupal\jsonapi\EventSubscriber;
 
+use Drupal\Core\Cache\CacheableMetadata;
 use Drupal\jsonapi\JsonApiSpec;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpKernel\Event\GetResponseEvent;
-use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
+use Drupal\Core\Http\Exception\CacheableBadRequestHttpException;
 use Symfony\Component\HttpKernel\KernelEvents;
 
 /**
@@ -60,7 +61,7 @@ class JsonApiRequestValidator implements EventSubscriberInterface {
     // direction. (This is special cased because using it is pretty common.)
     if (in_array('_format', $invalid_query_params, TRUE)) {
       $uri_without_query_string = $request->getSchemeAndHttpHost() . $request->getBaseUrl() . $request->getPathInfo();
-      $exception = new BadRequestHttpException('JSON API does not need that ugly \'_format\' query string! 🤘 Use the URL provided in \'links\' 🙏');
+      $exception = new CacheableBadRequestHttpException((new CacheableMetadata())->addCacheContexts(['url.query_args:_format']), 'JSON API does not need that ugly \'_format\' query string! 🤘 Use the URL provided in \'links\' 🙏');
       $exception->setHeaders(['Link' => $uri_without_query_string]);
       throw $exception;
     }
@@ -70,7 +71,7 @@ class JsonApiRequestValidator implements EventSubscriberInterface {
     }
 
     $message = sprintf('The following query parameters violate the JSON API spec: \'%s\'.', implode("', '", $invalid_query_params));
-    $exception = new BadRequestHttpException($message);
+    $exception = new CacheableBadRequestHttpException((new CacheableMetadata())->addCacheContexts(['url.query_args']), $message);
     $exception->setHeaders(['Link' => 'http://jsonapi.org/format/#query-parameters']);
     throw $exception;
   }

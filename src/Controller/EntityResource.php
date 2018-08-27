@@ -31,6 +31,7 @@ use Drupal\jsonapi\ResourceType\ResourceType;
 use Drupal\jsonapi\ResourceType\ResourceTypeRepositoryInterface;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
+use Drupal\Core\Http\Exception\CacheableBadRequestHttpException;
 use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 
 /**
@@ -320,7 +321,7 @@ class EntityResource {
    * @return \Drupal\jsonapi\ResourceResponse
    *   The response.
    *
-   * @throws \Symfony\Component\HttpKernel\Exception\BadRequestHttpException
+   * @throws \Drupal\Core\Http\Exception\CacheableBadRequestHttpException
    *   Thrown when filtering on a config entity which does not support it.
    */
   public function getCollection(ResourceType $resource_type, Request $request) {
@@ -353,7 +354,8 @@ class EntityResource {
       if (strpos($e->getMessage(), 'Getting the base fields is not supported for entity type') === 0) {
         preg_match('/entity type (.*)\./', $e->getMessage(), $matches);
         $config_entity_type_id = $matches[1];
-        throw new BadRequestHttpException(sprintf("Filtering on config entities is not supported by Drupal's entity API. You tried to filter on a %s config entity.", $config_entity_type_id));
+        $cacheability = (new CacheableMetadata())->addCacheContexts(['url.path', 'url.query_args:filter']);
+        throw new CacheableBadRequestHttpException($cacheability, sprintf("Filtering on config entities is not supported by Drupal's entity API. You tried to filter on a %s config entity.", $config_entity_type_id));
       }
       else {
         throw $e;
@@ -881,7 +883,7 @@ class EntityResource {
    * @return bool
    *   Whether the field should be PATCHed or not.
    *
-   * @throws \Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException
+   * @throws \Drupal\jsonapi\Exception\EntityAccessDeniedHttpException
    *   Thrown when the user sending the request is not allowed to update the
    *   field. Only thrown when the user could not abuse this information to
    *   determine the stored value.

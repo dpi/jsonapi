@@ -957,7 +957,7 @@ abstract class ResourceTestBase extends BrowserTestBase {
         ],
       ],
     ];
-    $this->assertResourceResponse(400, $expected_document, $response, ['4xx-response', 'http_response'], [''], FALSE, 'UNCACHEABLE');
+    $this->assertResourceResponse(400, $expected_document, $response, ['4xx-response', 'http_response'], ['url.query_args'], FALSE, 'MISS');
 
     // 200 for well-formed HEAD request.
     $response = $this->request('HEAD', $url, $request_options);

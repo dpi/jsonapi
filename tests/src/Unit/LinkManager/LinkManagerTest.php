@@ -4,6 +4,7 @@ namespace Drupal\Tests\jsonapi\Unit\LinkManager;
 
 use Drupal\Component\Utility\UrlHelper;
 use Drupal\Core\DependencyInjection\ContainerBuilder;
+use Drupal\Core\Http\Exception\CacheableBadRequestHttpException;
 use Drupal\Core\Routing\UrlGeneratorInterface;
 use Drupal\Core\Utility\UnroutedUrlAssemblerInterface;
 use Drupal\jsonapi\LinkManager\LinkManager;
@@ -13,7 +14,6 @@ use Prophecy\Argument;
 use Symfony\Cmf\Component\Routing\ChainRouterInterface;
 use Symfony\Component\HttpFoundation\ParameterBag;
 use Symfony\Component\HttpFoundation\Request;
-use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
 
 /**
  * @coversDefaultClass \Drupal\jsonapi\LinkManager\LinkManager
@@ -51,7 +51,13 @@ class LinkManagerTest extends UnitTestCase {
         return $args[0] . '?' . UrlHelper::buildQuery($args[1]['query']);
       });
 
+    $cache_contexts_manager = $this->getMockBuilder('Drupal\Core\Cache\Context\CacheContextsManager')
+      ->disableOriginalConstructor()
+      ->getMock();
+    $cache_contexts_manager->method('assertValidTokens')->willReturn(TRUE);
+
     $container = new ContainerBuilder();
+    $container->set('cache_contexts_manager', $cache_contexts_manager);
     $container->set('unrouted_url_assembler', $assembler->reveal());
     \Drupal::setContainer($container);
 
@@ -155,7 +161,7 @@ class LinkManagerTest extends UnitTestCase {
    * @dataProvider getPagerLinksErrorProvider
    */
   public function testGetPagerLinksError($offset, $size, $has_next_page, $total, $include_count, array $pages) {
-    $this->setExpectedException(BadRequestHttpException::class);
+    $this->setExpectedException(CacheableBadRequestHttpException::class);
     $this->testGetPagerLinks($offset, $size, $has_next_page, $total, $include_count, $pages);
   }
 
