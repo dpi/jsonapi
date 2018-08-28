@@ -1790,6 +1790,18 @@ abstract class ResourceTestBase extends BrowserTestBase {
         }
       }
     }
+    if (isset($resource_document['meta']['omitted'])) {
+      // @todo remove this loop when inaccessible relationships are able to raise errors in https://www.drupal.org/project/jsonapi/issues/2956084.
+      foreach ($resource_document['meta']['omitted']['links'] as $link_key => $link) {
+        if ($link_key !== 'help' && strpos($link['meta']['detail'], 'The current user is not allowed to view this relationship.') === 0) {
+          unset($resource_document['meta']['omitted']['links'][$link_key]);
+        }
+      }
+      // Don't add the omitted member if only the 'help' link remains.
+      if (count($resource_document['meta']['omitted']['links']) > 1) {
+        $expected_document['meta']['omitted'] = $resource_document['meta']['omitted'];
+      }
+    }
     return $expected_response = (new ResourceResponse($expected_document))
       ->addCacheableDependency($individual_response->getCacheableMetadata())
       ->addCacheableDependency($resource_data->getCacheableMetadata());
@@ -2653,6 +2665,20 @@ abstract class ResourceTestBase extends BrowserTestBase {
       $related_document = $related_response->getResponseData();
       $expected_cacheability->addCacheableDependency($related_response->getCacheableMetadata());
       $expected_cacheability->setCacheTags(array_values(array_diff($expected_cacheability->getCacheTags(), ['4xx-response'])));
+      if (!empty($related_document['meta']['omitted']['links'])) {
+        if (!isset($expected_document['meta']['omitted'])) {
+          $expected_document['meta']['omitted'] = $related_document['meta']['omitted'];
+        }
+        else {
+          // If any of the related response documents had omitted items, we should
+          // later expect the document to have those omitted items too.
+          foreach ($related_document['meta']['omitted']['links'] as $link_key => $link) {
+            if ($link_key !== 'help') {
+              $expected_document['meta']['omitted']['links'][$link_key] = $link;
+            }
+          }
+        }
+      }
       if (isset($related_document['data'])) {
         $related_data = $related_document['data'];
         $related_resources = (static::isResourceIdentifier($related_data))

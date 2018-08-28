@@ -147,11 +147,33 @@ class JsonApiDocumentTopLevelNormalizerValue implements ValueExtractorInterface,
 
     $rasterized['links'] = [];
 
+    $uuid_generator = \Drupal::service('uuid');
     foreach ($this->values as $normalizer_value) {
       if ($normalizer_value instanceof HttpExceptionNormalizerValue) {
-        $previous_errors = NestedArray::getValue($rasterized, ['meta', 'errors']) ?: [];
+        if (!isset($rasterized['meta']['omitted'])) {
+          $rasterized['meta']['omitted'] = [
+            'detail' => 'Some resources have been omitted because of insufficient authorization.',
+            'links' => [
+              'help' => 'https://www.drupal.org/docs/8/modules/json-api/filtering#filters-access-control',
+            ],
+          ];
+        }
         // Add the errors to the pre-existing errors.
-        $rasterized['meta']['errors'] = array_merge($previous_errors, $normalizer_value->rasterizeValue());
+        foreach ($normalizer_value->rasterizeValue() as $error) {
+          // JSON API links cannot be arrays and the spec generally favors link
+          // relation types as keys. 'item' is the right link relation type, but
+          // we need multiple values. So, we're just generating a meaningless,
+          // random value to use as a unique key. We don't use the UUID directly
+          // so as not to imply that it's an identifier for the error.
+          $link_key = 'item:' . substr(str_replace('-', '', $uuid_generator->generate()), 0, 7);
+          $rasterized['meta']['omitted']['links'][$link_key] = [
+            'href' => $error['links']['via'],
+            'meta' => [
+              'rel' => 'item',
+              'detail' => $error['detail'],
+            ],
+          ];
+        }
       }
       else {
         $rasterized_value = $normalizer_value->rasterizeValue();
@@ -207,19 +229,14 @@ class JsonApiDocumentTopLevelNormalizerValue implements ValueExtractorInterface,
           if ($included_item['data']) {
             $rasterized['included'][] = $included_item['data'];
           }
-          if (!empty($included_item['meta']['errors'])) {
-            foreach ($included_item['meta']['errors'] as $error) {
-              $rasterized['meta']['errors'][] = $error;
+          if (!empty($included_item['meta']['omitted'])) {
+            $rasterized['meta']['omitted']['detail'] = 'Some resources have been omitted because of insufficient authorization.';
+            foreach ($included_item['meta']['omitted']['links'] as $link_key => $link) {
+              $rasterized['meta']['omitted']['links'][$link_key] = $link;
             }
           }
         }
       }
-    }
-
-    if (!empty($rasterized['meta']['errors'])) {
-      $omitted = $this->mapErrorsToOmittedItems($rasterized['meta']['errors']);
-      unset($rasterized['meta']['errors']);
-      $rasterized['meta']['omitted'] = $omitted;
     }
 
     if (empty($rasterized['links'])) {
@@ -265,42 +282,6 @@ class JsonApiDocumentTopLevelNormalizerValue implements ValueExtractorInterface,
     return array_map(function ($include) {
       return $include->rasterizeValue();
     }, $this->getIncludes());
-  }
-
-  /**
-   * Maps `meta.errors` objects into a `meta.omitted` member.
-   *
-   * @param array $errors
-   *   The original errors.
-   *
-   * @return array
-   *   An omitted object to be added to a document.
-   *
-   * @todo: remove this in https://www.drupal.org/project/jsonapi/issues/2994480. This is a temporary measure to stabilize the 2.x HTTP API for errors.
-   */
-  protected function mapErrorsToOmittedItems(array $errors) {
-    $omitted = [
-      'detail' => 'Some resources have been omitted because of insufficient authorization.',
-      'links' => [
-        'help' => 'https://www.drupal.org/docs/8/modules/json-api/filtering#filters-access-control',
-      ],
-    ];
-    foreach ($errors as $error) {
-      // JSON API links cannot be arrays and the spec generally favors a link
-      // relation types as keys. 'item' is the right link relation type, but we
-      // need multiple values. So, we're just generating a meaningless, random
-      // value to use as a unique key. We don't use the UUID directly so as not
-      // to imply that it's an identifier for the error.
-      $link_key = 'item:' . substr(str_replace('-', '', \Drupal::service('uuid')->generate()), 0, 7);
-      $omitted['links'][$link_key] = [
-        'href' => $error['links']['via'],
-        'meta' => [
-          'rel' => 'item',
-          'detail' => $error['detail'],
-        ],
-      ];
-    }
-    return $omitted;
   }
 
 }

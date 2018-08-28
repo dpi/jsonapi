@@ -261,7 +261,7 @@ class JsonApiDocumentTopLevelNormalizerTest extends JsonapiKernelTestBase {
         'related' => 'dummy_entity_link',
       ],
     ], $normalized['data']['relationships']['uid']);
-    $this->assertTrue(empty($normalized['meta']['errors']));
+    $this->assertTrue(empty($normalized['meta']['omitted']));
     $this->assertSame($this->user->uuid(), $normalized['included'][0]['id']);
     $this->assertSame('user--user', $normalized['included'][0]['type']);
     $this->assertSame('user1', $normalized['included'][0]['attributes']['name']);
@@ -363,7 +363,7 @@ class JsonApiDocumentTopLevelNormalizerTest extends JsonapiKernelTestBase {
     $this->assertEquals($this->node->type->entity->uuid(), $normalized['data']['relationships']['node_type']['data']['id']);
     $this->assertEquals($this->user->uuid(), $normalized['data']['relationships']['uid']['data']['id']);
     $this->assertFalse(empty($normalized['included'][0]['id']));
-    $this->assertTrue(empty($normalized['meta']['errors']));
+    $this->assertTrue(empty($normalized['meta']['omitted']));
     $this->assertEquals($this->user->uuid(), $normalized['included'][0]['id']);
     $this->assertCount(1, $normalized['included'][0]['attributes']);
     $this->assertCount(floatval(\Drupal::VERSION) >= 8.6 ? 8 : 7, $normalized['included'][1]['attributes']);

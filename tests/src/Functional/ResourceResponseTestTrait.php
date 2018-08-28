@@ -46,15 +46,16 @@ trait ResourceResponseTestTrait {
     $omitted = $errors = [];
     foreach ($responses as $response) {
       $response_document = $response->getResponseData();
-      // If any of the response documents had top-level or meta errors, we
-      // should later expect the merged document to have all these errors
-      // omitted yet linked under the 'meta' member.
+      // If any of the response documents had top-level errors, we should later
+      // expect the merged document to have all errors as omitted links under
+      // the 'meta.omitted' member.
       if (!empty($response_document['errors'])) {
         $errors = array_merge($errors, $response_document['errors']);
       }
       if (!empty($response_document['meta']['omitted']['links'])) {
         if (!empty($omitted)) {
-          foreach ($response_document['meta']['omitted']['links'] as $key => $link) {
+          $omitted_links = array_diff_key($response_document['meta']['omitted']['links'], array_flip(['help']));
+          foreach ($omitted_links as $key => $link) {
             $omitted['links'][$key] = $link;
           }
         }
@@ -95,7 +96,7 @@ trait ResourceResponseTestTrait {
       $merged_document['meta']['omitted']['detail'] = 'Some resources have been omitted because of insufficient authorization.';
       $merged_document['meta']['omitted']['links']['help'] = 'https://www.drupal.org/docs/8/modules/json-api/filtering#filters-access-control';
       foreach ($errors as $index => $error) {
-        $merged_document['meta']['omitted']['links']['item:' . md5((string) $index)] = [
+        $merged_document['meta']['omitted']['links']['item:' . \Drupal::service('uuid')->generate()] = [
           'href' => $error['links']['via'],
           'meta' => [
             'rel' => 'item',
@@ -143,12 +144,12 @@ trait ResourceResponseTestTrait {
       foreach ($field_names as $public_field_name) {
         $field_name = $this->resourceType->getInternalName($public_field_name);
         $collected_responses = [];
-        $via_link = Url::fromRoute(
-          sprintf('jsonapi.%s.%s.related', $entity->getEntityTypeId() . '--' . $entity->bundle(), $public_field_name),
-          [$entity->getEntityTypeId() => $entity->uuid()]
-        );
         $field_access = static::entityFieldAccess($entity, $field_name, 'view', $this->account);
         if (!$field_access->isAllowed()) {
+          $via_link = Url::fromRoute(
+            sprintf('jsonapi.%s.%s.related', $entity->getEntityTypeId() . '--' . $entity->bundle(), $public_field_name),
+            [$entity->getEntityTypeId() => $entity->uuid()]
+          );
           $collected_responses[] = static::getAccessDeniedResponse($entity, $field_access, $via_link, $field_name, 'The current user is not allowed to view this relationship.', $field_name);
           break;
         }
@@ -161,6 +162,10 @@ trait ResourceResponseTestTrait {
             $resource_identifier = static::toResourceIdentifier($target_entity);
             if (!static::collectionHasResourceIdentifier($resource_identifier, $data['already_checked'])) {
               $data['already_checked'][] = $resource_identifier;
+              $via_link = Url::fromRoute(
+                sprintf('jsonapi.%s.individual', $resource_identifier['type']),
+                [$target_entity->getEntityTypeId() => $resource_identifier['id']]
+              );
               $collected_responses[] = static::getAccessDeniedResponse($entity, $target_access, $via_link, NULL, NULL, '/data');
             }
             break;
