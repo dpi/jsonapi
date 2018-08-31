@@ -310,4 +310,131 @@ class JsonApiRegressionTest extends JsonApiFunctionalTestBase {
     $this->assertTrue(in_array('user.node_grants:view', explode(' ', $response->getHeader('X-Drupal-Cache-Contexts')[0]), TRUE));
   }
 
+  /**
+   * Cannot GET an entity with dangling references in an ER field.
+   *
+   * @see https://www.drupal.org/project/jsonapi/issues/2984647
+   */
+  public function testDanglingReferencesInAnEntityReferenceFieldFromIssue2984647() {
+    // Set up data model.
+    $this->drupalCreateContentType(['type' => 'journal_issue']);
+    $this->drupalCreateContentType(['type' => 'journal_conference']);
+    $this->drupalCreateContentType(['type' => 'journal_article']);
+    $this->createEntityReferenceField(
+      'node',
+      'journal_article',
+      'field_issue',
+      NULL,
+      'node',
+      'default',
+      [
+        'target_bundles' => [
+          'journal_issue' => 'journal_issue',
+        ],
+      ],
+      FieldStorageDefinitionInterface::CARDINALITY_UNLIMITED
+    );
+    $this->createEntityReferenceField(
+      'node',
+      'journal_article',
+      'field_mentioned_in',
+      NULL,
+      'node',
+      'default',
+      [
+        'target_bundles' => [
+          'journal_issue' => 'journal_issue',
+          'journal_conference' => 'journal_conference',
+        ],
+      ],
+      FieldStorageDefinitionInterface::CARDINALITY_UNLIMITED
+    );
+    $this->rebuildAll();
+
+    // Create data.
+    $issue_node = Node::create([
+      'title' => 'Test Journal Issue',
+      'type' => 'journal_issue',
+    ]);
+    $issue_node->save();
+    $conference_node = Node::create([
+      'title' => 'First Journal Conference!',
+      'type' => 'journal_conference',
+    ]);
+    $conference_node->save();
+
+    $user = $this->drupalCreateUser([
+      'access content',
+      'edit own journal_article content',
+    ]);
+    $article_node = Node::create([
+      'title' => 'Test Journal Article',
+      'type' => 'journal_article',
+      'field_issue' => [
+        ['target_id' => $issue_node->id()],
+      ],
+      'field_mentioned_in' => [
+        ['target_id' => $issue_node->id()],
+        ['target_id' => $conference_node->id()],
+      ],
+    ]);
+    $article_node->setOwner($user);
+    $article_node->save();
+
+    // Test.
+    $url = Url::fromUri(sprintf('internal:/jsonapi/node/journal_article/%s', $article_node->uuid()));
+    $request_options = [
+      RequestOptions::HEADERS => [
+        'Content-Type' => 'application/vnd.api+json',
+        'Accept' => 'application/vnd.api+json',
+      ],
+      RequestOptions::AUTH => [$user->getUsername(), $user->pass_raw],
+    ];
+    $issue_node->delete();
+    $response = $this->request('GET', $url, $request_options);
+    $this->assertSame(200, $response->getStatusCode());
+
+    // Entity reference field allowing a single bundle: dangling reference's
+    // resource type is deduced.
+    $this->assertSame([
+      [
+        'type' => 'node--journal_issue',
+        'id' => 'missing',
+        'meta' => [
+          'links' => [
+            'help' => [
+              'href' => 'https://www.drupal.org/docs/8/modules/json-api/core-concepts#missing',
+              'meta' => [
+                'about' => "Usage and meaning of the 'missing' resource identifier.",
+              ],
+            ],
+          ],
+        ],
+      ],
+    ], Json::decode((string)$response->getBody())['data']['relationships']['field_issue']['data']);
+
+    // Entity reference field allowing multiple bundles: dangling reference's
+    // resource type is NOT deduced.
+    $this->assertSame([
+      [
+        'type' => 'unknown',
+        'id' => 'missing',
+        'meta' => [
+          'links' => [
+            'help' => [
+              'href' => 'https://www.drupal.org/docs/8/modules/json-api/core-concepts#missing',
+              'meta' => [
+                'about' => "Usage and meaning of the 'missing' resource identifier.",
+              ],
+            ],
+          ],
+        ],
+      ],
+      [
+        'type' => 'node--journal_conference',
+        'id' => $conference_node->uuid(),
+      ],
+    ], Json::decode((string)$response->getBody())['data']['relationships']['field_mentioned_in']['data']);
+  }
+
 }

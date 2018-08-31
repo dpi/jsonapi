@@ -267,7 +267,9 @@ class ResourceType {
     $this->isLocatable = $is_locatable;
     $this->isMutable = $is_mutable;
 
-    $this->typeName = sprintf('%s--%s', $this->entityTypeId, $this->bundle);
+    $this->typeName = $this->bundle === '?'
+      ? 'unknown'
+      : sprintf('%s--%s', $this->entityTypeId, $this->bundle);
 
     $this->disabledFields = array_keys(array_filter($field_mapping, function ($v) {
       return $v === FALSE;

@@ -66,19 +66,35 @@ class EntityReferenceFieldNormalizer extends FieldNormalizer {
       // A non-empty entity reference field that refers to a non-existent entity
       // is not a data integrity problem. For example, Term entities' "parent"
       // entity reference field uses target_id zero to refer to the non-existent
-      // "<root>" term.
+      // "<root>" term. And references to entities that no longer exist are not
+      // cleaned up by Drupal; hence we map it to a "missing" resource
       if (!$item->isEmpty() && $item->get('entity')->getValue() === NULL) {
-        $entity_list[] = NULL;
-        $entity_list_metadata[] = [
-          'links' => [
-            'help' => [
-              'href' => 'https://www.drupal.org/docs/8/modules/json-api/core-concepts#virtual',
-              'meta' => [
-                'about' => "Usage and meaning of the 'virtual' resource identifier.",
+        if ($field->getFieldDefinition()->getFieldStorageDefinition()->getSetting('target_type') === 'taxonomy_term' && $item->get('target_id')->getCastedValue() === 0) {
+          $entity_list[] = NULL;
+          $entity_list_metadata[] = [
+            'links' => [
+              'help' => [
+                'href' => 'https://www.drupal.org/docs/8/modules/json-api/core-concepts#virtual',
+                'meta' => [
+                  'about' => "Usage and meaning of the 'virtual' resource identifier.",
+                ],
               ],
             ],
-          ],
-        ];
+          ];
+        }
+        else {
+          $entity_list[] = FALSE;
+          $entity_list_metadata[] = [
+            'links' => [
+              'help' => [
+                'href' => 'https://www.drupal.org/docs/8/modules/json-api/core-concepts#missing',
+                'meta' => [
+                  'about' => "Usage and meaning of the 'missing' resource identifier.",
+                ],
+              ],
+            ],
+          ];
+        }
         continue;
       }
 

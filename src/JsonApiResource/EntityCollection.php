@@ -45,7 +45,7 @@ class EntityCollection implements \IteratorAggregate, \Countable {
   /**
    * Instantiates a EntityCollection object.
    *
-   * @param \Drupal\Core\Entity\EntityInterface|null[] $resources
+   * @param \Drupal\Core\Entity\EntityInterface|null[]|false[] $resources
    *   The resources for the collection.
    * @param int $cardinality
    *   The number of resources that this collection may contain. Related
@@ -55,7 +55,8 @@ class EntityCollection implements \IteratorAggregate, \Countable {
    */
   public function __construct(array $resources, $cardinality = -1) {
     assert(Inspector::assertAll(function ($entity) {
-      return $entity === NULL
+        return $entity === NULL
+        || $entity === FALSE
         || $entity instanceof EntityInterface
         || $entity instanceof LabelOnlyEntity
         || $entity instanceof EntityAccessDeniedHttpException;
