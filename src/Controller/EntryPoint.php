@@ -110,7 +110,7 @@ class EntryPoint extends ControllerBase {
     ];
     $json_response->addCacheableDependency((new CacheableMetadata())->addCacheContexts(['user.roles:authenticated']));
     if ($this->user->isAuthenticated()) {
-      $me_url = Url::fromRoute('jsonapi.user--user.individual', ['user' => User::load($this->user->id())->uuid()])
+      $me_url = Url::fromRoute('jsonapi.user--user.individual', ['entity' => User::load($this->user->id())->uuid()])
         ->setAbsolute()
         ->toString(TRUE);
       $doc['meta']['links']['me'] = $me_url->getGeneratedUrl();

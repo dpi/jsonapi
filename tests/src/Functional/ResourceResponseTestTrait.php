@@ -148,7 +148,7 @@ trait ResourceResponseTestTrait {
         if (!$field_access->isAllowed()) {
           $via_link = Url::fromRoute(
             sprintf('jsonapi.%s.%s.related', $entity->getEntityTypeId() . '--' . $entity->bundle(), $public_field_name),
-            [$entity->getEntityTypeId() => $entity->uuid()]
+            ['entity' => $entity->uuid()]
           );
           $collected_responses[] = static::getAccessDeniedResponse($entity, $field_access, $via_link, $field_name, 'The current user is not allowed to view this relationship.', $field_name);
           break;
@@ -164,7 +164,7 @@ trait ResourceResponseTestTrait {
               $data['already_checked'][] = $resource_identifier;
               $via_link = Url::fromRoute(
                 sprintf('jsonapi.%s.individual', $resource_identifier['type']),
-                [$target_entity->getEntityTypeId() => $resource_identifier['id']]
+                ['entity' => $resource_identifier['id']]
               );
               $collected_responses[] = static::getAccessDeniedResponse($entity, $target_access, $via_link, NULL, NULL, '/data');
             }
@@ -357,8 +357,7 @@ trait ResourceResponseTestTrait {
     assert(static::isResourceIdentifier($resource_identifier));
     $resource_type = $resource_identifier['type'];
     $resource_id = $resource_identifier['id'];
-    $entity_type_id = explode('--', $resource_type)[0];
-    $url = Url::fromRoute(sprintf('jsonapi.%s.individual', $resource_type), [$entity_type_id => $resource_id]);
+    $url = Url::fromRoute(sprintf('jsonapi.%s.individual', $resource_type), ['entity' => $resource_id]);
     return $url->setAbsolute()->toString();
   }
 

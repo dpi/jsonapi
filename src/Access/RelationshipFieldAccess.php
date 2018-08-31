@@ -47,7 +47,7 @@ class RelationshipFieldAccess implements AccessInterface {
     $entity_operation = $request->isMethodCacheable() ? 'view' : 'update';
     if ($resource_type = $request->get(Routes::RESOURCE_TYPE_KEY)) {
       assert($resource_type instanceof ResourceType);
-      $entity = $request->get($resource_type->getEntityTypeId());
+      $entity = $request->get('entity');
       $internal_name = $resource_type->getInternalName($relationship_field_name);
       if ($entity instanceof FieldableEntityInterface && $entity->hasField($internal_name)) {
         $entity_access = $entity->access($entity_operation, $account, TRUE);

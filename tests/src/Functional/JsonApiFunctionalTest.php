@@ -252,7 +252,7 @@ class JsonApiFunctionalTest extends JsonApiFunctionalTestBase {
     $this->assertGreaterThanOrEqual(2, count($single_output['included']));
     // 17. Single user (check fields lacking 'view' access).
     $user_url = Url::fromRoute('jsonapi.user--user.individual', [
-      'user' => $this->user->uuid(),
+      'entity' => $this->user->uuid(),
     ]);
     $response = $this->request('GET', $user_url, [
       'auth' => [
@@ -688,7 +688,7 @@ class JsonApiFunctionalTest extends JsonApiFunctionalTestBase {
       ],
     ];
     $individual_url = Url::fromRoute('jsonapi.node--article.individual', [
-      'node' => $uuid,
+      'entity' => $uuid,
     ]);
     $response = $this->request('PATCH', $individual_url, [
       'body' => Json::encode($body),
@@ -708,7 +708,7 @@ class JsonApiFunctionalTest extends JsonApiFunctionalTestBase {
       ],
     ];
     $individual_url = Url::fromRoute('jsonapi.node--article.individual', [
-      'node' => $uuid,
+      'entity' => $uuid,
     ]);
     $response = $this->request('PATCH', $individual_url, [
       'body' => Json::encode($body),
@@ -750,7 +750,7 @@ class JsonApiFunctionalTest extends JsonApiFunctionalTestBase {
       ],
     ];
     $relationship_url = Url::fromRoute('jsonapi.node--article.field_tags.relationship', [
-      'node' => $uuid,
+      'entity' => $uuid,
     ]);
     $response = $this->request('POST', $relationship_url, [
       'body' => Json::encode($body),

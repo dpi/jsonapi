@@ -60,9 +60,8 @@ class RequestHandler {
     // plugin.
     $parameters = ['resource_type' => $resource_type];
 
-    $entity_type_id = $resource_type->getEntityTypeId();
-    if ($entity = $request->get($entity_type_id)) {
-      $parameters[$entity_type_id] = $entity;
+    if ($entity = $request->get('entity')) {
+      $parameters['entity'] = $entity;
     }
 
     if ($related = $request->get('related')) {
@@ -162,7 +161,7 @@ class RequestHandler {
         elseif ($request->get('related')) {
           return 'getRelated';
         }
-        return $request->get($resource_type->getEntityTypeId()) ? 'getIndividual' : 'getCollection';
+        return $request->get('entity') ? 'getIndividual' : 'getCollection';
 
       case 'post':
         return ($on_relationship) ? 'addToRelationshipData' : 'createIndividual';

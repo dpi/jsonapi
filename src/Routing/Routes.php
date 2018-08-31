@@ -211,7 +211,7 @@ class Routes implements ContainerInjectionInterface {
     $entity_type_id = $resource_type->getEntityTypeId();
 
     // Individual read, update and remove.
-    $individual_route = new Route("/{$path}/{{$entity_type_id}}");
+    $individual_route = new Route("/{$path}/{entity}");
     $individual_route->setMethods(['GET']);
     // No _entity_access requirement because "view" and "view label" access are
     // checked in the controller. So it's safe to allow anybody access.
@@ -221,12 +221,12 @@ class Routes implements ContainerInjectionInterface {
       $individual_update_route = new Route($individual_route->getPath());
       $individual_update_route->setMethods(['PATCH']);
       $individual_update_route->addDefaults(['serialization_class' => JsonApiDocumentTopLevel::class]);
-      $individual_update_route->setRequirement('_entity_access', "{$entity_type_id}.update");
+      $individual_update_route->setRequirement('_entity_access', "entity.update");
       $individual_update_route->setRequirement('_csrf_request_header_token', 'TRUE');
       $routes->add(static::getRouteName($resource_type, 'individual.patch'), $individual_update_route);
       $individual_remove_route = new Route($individual_route->getPath());
       $individual_remove_route->setMethods(['DELETE']);
-      $individual_remove_route->setRequirement('_entity_access', "{$entity_type_id}.delete");
+      $individual_remove_route->setRequirement('_entity_access', "entity.delete");
       $individual_remove_route->setRequirement('_csrf_request_header_token', 'TRUE');
       $routes->add(static::getRouteName($resource_type, 'individual.delete'), $individual_remove_route);
     }
@@ -234,7 +234,7 @@ class Routes implements ContainerInjectionInterface {
     foreach ($resource_type->getRelatableResourceTypes() as $relationship_field_name => $target_resource_types) {
       // Read, update, add, or remove an individual resources relationships to
       // other resources.
-      $relationship_route = new Route("/{$path}/{{$entity_type_id}}/relationships/{$relationship_field_name}");
+      $relationship_route = new Route("/{$path}/{entity}/relationships/{$relationship_field_name}");
       $relationship_route->setMethods($resource_type->isMutable()
         ? ['GET', 'POST', 'PATCH', 'DELETE']
         : ['GET']
@@ -250,7 +250,7 @@ class Routes implements ContainerInjectionInterface {
       // non-internal resource type.
       if (static::hasNonInternalTargetResourceTypes($target_resource_types)) {
         // Get an individual resource's related resources.
-        $related_route = new Route("/{$path}/{{$entity_type_id}}/{$relationship_field_name}");
+        $related_route = new Route("/{$path}/{entity}/{$relationship_field_name}");
         $related_route->setMethods(['GET']);
         $related_route->addDefaults(['related' => $relationship_field_name]);
         $related_route->setRequirement(RelationshipFieldAccess::ROUTE_REQUIREMENT_KEY, $relationship_field_name);
@@ -259,7 +259,7 @@ class Routes implements ContainerInjectionInterface {
     }
 
     // Add entity parameter conversion to every route.
-    $routes->addOptions(['parameters' => [$entity_type_id => ['type' => 'entity:' . $entity_type_id]]]);
+    $routes->addOptions(['parameters' => ['entity' => ['type' => 'entity:' . $entity_type_id]]]);
 
     return $routes;
   }

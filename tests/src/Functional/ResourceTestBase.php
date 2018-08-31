@@ -893,7 +893,7 @@ abstract class ResourceTestBase extends BrowserTestBase {
     //   error responses provide a good DX
     // - to eventually result in a well-formed request that succeeds.
     // @todo Remove line below in favor of commented line in https://www.drupal.org/project/jsonapi/issues/2878463.
-    $url = Url::fromRoute(sprintf('jsonapi.%s.individual', static::$resourceTypeName), [static::$entityTypeId => $this->entity->uuid()]);
+    $url = Url::fromRoute(sprintf('jsonapi.%s.individual', static::$resourceTypeName), ['entity' => $this->entity->uuid()]);
     /* $url = $this->entity->toUrl('jsonapi'); */
     $request_options = [];
     $request_options[RequestOptions::HEADERS]['Accept'] = 'application/vnd.api+json';
@@ -1044,11 +1044,11 @@ abstract class ResourceTestBase extends BrowserTestBase {
 
     // DX: 404 when GETting non-existing entity.
     $random_uuid = \Drupal::service('uuid')->generate();
-    $url = Url::fromRoute(sprintf('jsonapi.%s.individual', static::$resourceTypeName), [static::$entityTypeId => $random_uuid]);
+    $url = Url::fromRoute(sprintf('jsonapi.%s.individual', static::$resourceTypeName), ['entity' => $random_uuid]);
     $response = $this->request('GET', $url, $request_options);
     $message_url = clone $url;
-    $path = str_replace($random_uuid, '{' . static::$entityTypeId . '}', $message_url->setAbsolute()->setOptions(['base_url' => '', 'query' => []])->toString());
-    $message = 'The "' . static::$entityTypeId . '" parameter was not converted for the path "' . $path . '" (route name: "jsonapi.' . static::$resourceTypeName . '.individual")';
+    $path = str_replace($random_uuid, '{entity}', $message_url->setAbsolute()->setOptions(['base_url' => '', 'query' => []])->toString());
+    $message = 'The "entity" parameter was not converted for the path "' . $path . '" (route name: "jsonapi.' . static::$resourceTypeName . '.individual")';
     $this->assertResourceErrorResponse(404, $message, $url, $response, FALSE, ['4xx-response', 'http_response'], [''], FALSE, 'UNCACHEABLE');
 
     // DX: when Accept request header is missing, still 404, same response.
@@ -1369,7 +1369,7 @@ abstract class ResourceTestBase extends BrowserTestBase {
     $update_access = static::entityAccess($resource, 'update', $this->account)
       ->andIf(static::entityFieldAccess($resource, $relationship_field_name, 'edit', $this->account));
     $url = Url::fromRoute(sprintf("jsonapi.{$resource_identifier['type']}.{$relationship_field_name}.relationship"), [
-      $resource->getEntityTypeId() => $resource->uuid(),
+      'entity' => $resource->uuid(),
     ]);
 
     // Test POST: missing content-type.
@@ -1605,7 +1605,7 @@ abstract class ResourceTestBase extends BrowserTestBase {
     if (!$access->isAllowed()) {
       $via_link = Url::fromRoute(
         sprintf('jsonapi.%s.%s.relationship', static::$resourceTypeName, $relationship_field_name),
-        [$entity->getEntityTypeId() => $entity->uuid()]
+        ['entity' => $entity->uuid()]
       );
       return static::getAccessDeniedResponse($this->entity, $access, $via_link, $relationship_field_name, 'The current user is not allowed to view this relationship.', FALSE);
     }
@@ -1715,7 +1715,7 @@ abstract class ResourceTestBase extends BrowserTestBase {
         $detail = 'The current user is not allowed to view this relationship.';
         $via_link = Url::fromRoute(
           sprintf('jsonapi.%s.%s.related', $base_resource_identifier['type'], $relationship_field_name),
-          [$entity->getEntityTypeId() => $base_resource_identifier['id']]
+          ['entity' => $base_resource_identifier['id']]
         );
         $related_response = static::getAccessDeniedResponse($entity, $access, $via_link, $relationship_field_name, $detail, FALSE);
       }
@@ -1771,7 +1771,7 @@ abstract class ResourceTestBase extends BrowserTestBase {
     $expected_document = $individual_response->getResponseData();
     $self_link = Url::fromRoute(
       sprintf('jsonapi.%s.individual', static::$resourceTypeName),
-      [static::$entityTypeId => $this->entity->uuid()],
+      ['entity' => $this->entity->uuid()],
       ['query' => ['include' => implode(',', $include_paths)]]
     )->setAbsolute()->toString();
     $expected_document['links']['self'] = $self_link;
@@ -1953,7 +1953,7 @@ abstract class ResourceTestBase extends BrowserTestBase {
     if (get_class($this->entityStorage) !== ContentEntityNullStorage::class) {
       $uuid = $this->entityStorage->load(static::$firstCreatedEntityId)->uuid();
       // @todo Remove line below in favor of commented line in https://www.drupal.org/project/jsonapi/issues/2878463.
-      $location = Url::fromRoute(sprintf('jsonapi.%s.individual', static::$resourceTypeName), [static::$entityTypeId => $uuid])->setAbsolute(TRUE)->toString();
+      $location = Url::fromRoute(sprintf('jsonapi.%s.individual', static::$resourceTypeName), ['entity' => $uuid])->setAbsolute(TRUE)->toString();
       /* $location = $this->entityStorage->load(static::$firstCreatedEntityId)->toUrl('jsonapi')->setAbsolute(TRUE)->toString(); */
       $this->assertSame([$location], $response->getHeader('Location'));
 
@@ -2005,7 +2005,7 @@ abstract class ResourceTestBase extends BrowserTestBase {
     if ($this->entity->getEntityType()->getStorageClass() !== ContentEntityNullStorage::class && $this->entity->getEntityType()->hasKey('uuid')) {
       $uuid = $this->entityStorage->load(static::$secondCreatedEntityId)->uuid();
       // @todo Remove line below in favor of commented line in https://www.drupal.org/project/jsonapi/issues/2878463.
-      $location = Url::fromRoute(sprintf('jsonapi.%s.individual', static::$resourceTypeName), [static::$entityTypeId => $uuid])->setAbsolute(TRUE)->toString();
+      $location = Url::fromRoute(sprintf('jsonapi.%s.individual', static::$resourceTypeName), ['entity' => $uuid])->setAbsolute(TRUE)->toString();
       /* $location = $this->entityStorage->load(static::$secondCreatedEntityId)->toUrl('jsonapi')->setAbsolute(TRUE)->toString(); */
       $this->assertSame([$location], $response->getHeader('Location'));
 
@@ -2072,7 +2072,7 @@ abstract class ResourceTestBase extends BrowserTestBase {
     //   error responses provide a good DX
     // - to eventually result in a well-formed request that succeeds.
     // @todo Remove line below in favor of commented line in https://www.drupal.org/project/jsonapi/issues/2878463.
-    $url = Url::fromRoute(sprintf('jsonapi.%s.individual', static::$resourceTypeName), [static::$entityTypeId => $this->entity->uuid()]);
+    $url = Url::fromRoute(sprintf('jsonapi.%s.individual', static::$resourceTypeName), ['entity' => $this->entity->uuid()]);
     /* $url = $this->entity->toUrl('jsonapi'); */
     $request_options = [];
     $request_options[RequestOptions::HEADERS]['Accept'] = 'application/vnd.api+json';
@@ -2346,7 +2346,7 @@ abstract class ResourceTestBase extends BrowserTestBase {
     //   error responses provide a good DX
     // - to eventually result in a well-formed request that succeeds.
     // @todo Remove line below in favor of commented line in https://www.drupal.org/project/jsonapi/issues/2878463.
-    $url = Url::fromRoute(sprintf('jsonapi.%s.individual', static::$resourceTypeName), [static::$entityTypeId => $this->entity->uuid()]);
+    $url = Url::fromRoute(sprintf('jsonapi.%s.individual', static::$resourceTypeName), ['entity' => $this->entity->uuid()]);
     /* $url = $this->entity->toUrl('jsonapi'); */
     $request_options = [];
     $request_options[RequestOptions::HEADERS]['Accept'] = 'application/vnd.api+json';

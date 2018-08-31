@@ -116,7 +116,7 @@ class ConfigurableLanguageTest extends ResourceTestBase {
    */
   public function testGetIndividualDefaultConfig() {
     // @todo Remove line below in favor of commented line in https://www.drupal.org/project/jsonapi/issues/2878463.
-    $url = Url::fromRoute('jsonapi.configurable_language--configurable_language.individual', ['configurable_language' => ConfigurableLanguage::load('en')->uuid()]);
+    $url = Url::fromRoute('jsonapi.configurable_language--configurable_language.individual', ['entity' => ConfigurableLanguage::load('en')->uuid()]);
     /* $url = ConfigurableLanguage::load('en')->toUrl('jsonapi'); */
 
     $request_options = [];

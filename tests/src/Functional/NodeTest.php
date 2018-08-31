@@ -231,7 +231,7 @@ class NodeTest extends ResourceTestBase {
     $this->setUpAuthorization('PATCH');
 
     // @todo Remove line below in favor of commented line in https://www.drupal.org/project/jsonapi/issues/2878463.
-    $url = Url::fromRoute(sprintf('jsonapi.%s.individual', static::$resourceTypeName), [static::$entityTypeId => $this->entity->uuid()]);
+    $url = Url::fromRoute(sprintf('jsonapi.%s.individual', static::$resourceTypeName), ['entity' => $this->entity->uuid()]);
     /* $url = $this->entity->toUrl('jsonapi'); */
 
     // GET node's current normalization.
@@ -289,7 +289,7 @@ class NodeTest extends ResourceTestBase {
     $this->entity->setUnpublished()->save();
 
     // @todo Remove line below in favor of commented line in https://www.drupal.org/project/jsonapi/issues/2878463.
-    $url = Url::fromRoute(sprintf('jsonapi.%s.individual', static::$resourceTypeName), [static::$entityTypeId => $this->entity->uuid()]);
+    $url = Url::fromRoute(sprintf('jsonapi.%s.individual', static::$resourceTypeName), ['entity' => $this->entity->uuid()]);
     /* $url = $this->entity->toUrl('jsonapi'); */
     $request_options = $this->getAuthenticationRequestOptions();
 

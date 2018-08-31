@@ -182,7 +182,7 @@ class UserTest extends ResourceTestBase {
    */
   public function testPatchDxForSecuritySensitiveBaseFields() {
     // @todo Remove line below in favor of commented line in https://www.drupal.org/project/jsonapi/issues/2878463.
-    $url = Url::fromRoute(sprintf('jsonapi.user--user.individual'), ['user' => $this->account->uuid()]);
+    $url = Url::fromRoute(sprintf('jsonapi.user--user.individual'), ['entity' => $this->account->uuid()]);
     /* $url = $this->account->toUrl('jsonapi'); */
 
     $original_normalization = $this->normalize($this->account, $url);
@@ -346,7 +346,7 @@ class UserTest extends ResourceTestBase {
    */
   public function testPatchSecurityOtherUser() {
     // @todo Remove line below in favor of commented line in https://www.drupal.org/project/jsonapi/issues/2878463.
-    $url = Url::fromRoute(sprintf('jsonapi.user--user.individual'), ['user' => $this->account->uuid()]);
+    $url = Url::fromRoute(sprintf('jsonapi.user--user.individual'), ['entity' => $this->account->uuid()]);
     /* $url = $this->account->toUrl('jsonapi'); */
 
     $original_normalization = $this->normalize($this->account, $url);
@@ -416,7 +416,7 @@ class UserTest extends ResourceTestBase {
 
     $collection_url = Url::fromRoute('jsonapi.user--user.collection');
     // @todo Remove line below in favor of commented line in https://www.drupal.org/project/jsonapi/issues/2878463.
-    $user_a_url = Url::fromRoute(sprintf('jsonapi.user--user.individual'), ['user' => $user_a->uuid()]);
+    $user_a_url = Url::fromRoute(sprintf('jsonapi.user--user.individual'), ['entity' => $user_a->uuid()]);
     /* $user_a_url = $user_a->toUrl('jsonapi'); */
     $request_options = [];
     $request_options[RequestOptions::HEADERS]['Accept'] = 'application/vnd.api+json';
