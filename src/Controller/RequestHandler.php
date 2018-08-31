@@ -36,6 +36,8 @@ class RequestHandler {
    *
    * @param \Symfony\Component\Serializer\SerializerInterface $serializer
    *   The JSON API serializer.
+   * @param \Drupal\jsonapi\Controller\EntityResource $entity_resource
+   *   The JSON API entity resource controller.
    */
   public function __construct(SerializerInterface $serializer, EntityResource $entity_resource) {
     $this->serializer = $serializer;

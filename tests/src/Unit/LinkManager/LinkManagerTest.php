@@ -11,7 +11,6 @@ use Drupal\jsonapi\LinkManager\LinkManager;
 use Drupal\jsonapi\Query\OffsetPage;
 use Drupal\Tests\UnitTestCase;
 use Prophecy\Argument;
-use Symfony\Cmf\Component\Routing\ChainRouterInterface;
 use Symfony\Component\HttpFoundation\ParameterBag;
 use Symfony\Component\HttpFoundation\Request;
 

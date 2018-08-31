@@ -9,7 +9,6 @@ use Drupal\jsonapi\ResourceType\ResourceType;
 use Drupal\jsonapi\Query\OffsetPage;
 use Symfony\Component\HttpFoundation\Request;
 use Drupal\Core\Http\Exception\CacheableBadRequestHttpException;
-use Symfony\Component\Routing\Matcher\RequestMatcherInterface;
 
 /**
  * Class to generate links and queries for entities.

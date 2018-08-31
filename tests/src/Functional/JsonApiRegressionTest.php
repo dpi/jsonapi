@@ -411,7 +411,7 @@ class JsonApiRegressionTest extends JsonApiFunctionalTestBase {
           ],
         ],
       ],
-    ], Json::decode((string)$response->getBody())['data']['relationships']['field_issue']['data']);
+    ], Json::decode((string) $response->getBody())['data']['relationships']['field_issue']['data']);
 
     // Entity reference field allowing multiple bundles: dangling reference's
     // resource type is NOT deduced.
@@ -434,7 +434,7 @@ class JsonApiRegressionTest extends JsonApiFunctionalTestBase {
         'type' => 'node--journal_conference',
         'id' => $conference_node->uuid(),
       ],
-    ], Json::decode((string)$response->getBody())['data']['relationships']['field_mentioned_in']['data']);
+    ], Json::decode((string) $response->getBody())['data']['relationships']['field_mentioned_in']['data']);
   }
 
 }

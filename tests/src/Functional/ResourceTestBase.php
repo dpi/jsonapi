@@ -2670,8 +2670,8 @@ abstract class ResourceTestBase extends BrowserTestBase {
           $expected_document['meta']['omitted'] = $related_document['meta']['omitted'];
         }
         else {
-          // If any of the related response documents had omitted items, we should
-          // later expect the document to have those omitted items too.
+          // If any of the related response documents had omitted items, we
+          // should later expect the document to have those omitted items too.
           foreach ($related_document['meta']['omitted']['links'] as $link_key => $link) {
             if ($link_key !== 'help') {
               $expected_document['meta']['omitted']['links'][$link_key] = $link;

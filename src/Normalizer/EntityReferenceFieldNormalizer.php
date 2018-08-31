@@ -67,7 +67,7 @@ class EntityReferenceFieldNormalizer extends FieldNormalizer {
       // is not a data integrity problem. For example, Term entities' "parent"
       // entity reference field uses target_id zero to refer to the non-existent
       // "<root>" term. And references to entities that no longer exist are not
-      // cleaned up by Drupal; hence we map it to a "missing" resource
+      // cleaned up by Drupal; hence we map it to a "missing" resource.
       if (!$item->isEmpty() && $item->get('entity')->getValue() === NULL) {
         if ($field->getFieldDefinition()->getFieldStorageDefinition()->getSetting('target_type') === 'taxonomy_term' && $item->get('target_id')->getCastedValue() === 0) {
           $entity_list[] = NULL;
