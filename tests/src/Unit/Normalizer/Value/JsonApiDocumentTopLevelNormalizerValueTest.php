@@ -3,17 +3,12 @@
 namespace Drupal\Tests\jsonapi\Unit\Normalizer\Value;
 
 use Drupal\Component\DependencyInjection\Container;
-use Drupal\Core\Entity\EntityInterface;
-use Drupal\Core\Url;
-use Drupal\jsonapi\ResourceType\ResourceType;
-use Drupal\jsonapi\LinkManager\LinkManager;
 use Drupal\jsonapi\Normalizer\Value\JsonApiDocumentTopLevelNormalizerValue;
 use Drupal\jsonapi\Normalizer\Value\RelationshipNormalizerValue;
 use Drupal\jsonapi\Normalizer\Value\FieldNormalizerValueInterface;
-use Drupal\node\NodeInterface;
 use Drupal\Tests\UnitTestCase;
-use Prophecy\Argument;
 use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpFoundation\RequestStack;
 
 /**
  * @coversDefaultClass \Drupal\jsonapi\Normalizer\Value\JsonApiDocumentTopLevelNormalizerValue
@@ -40,8 +35,11 @@ class JsonApiDocumentTopLevelNormalizerValueTest extends UnitTestCase {
       ->disableOriginalConstructor()
       ->getMock();
     $cache_contexts_manager->method('assertValidTokens')->willReturn(TRUE);
+    $request_stack = new RequestStack();
+    $request_stack->push(Request::create('/'));
     $container = new Container();
     $container->set('cache_contexts_manager', $cache_contexts_manager);
+    $container->set('request_stack', $request_stack);
     \Drupal::setContainer($container);
 
     $field1 = $this->prophesize(FieldNormalizerValueInterface::class);
@@ -83,32 +81,13 @@ class JsonApiDocumentTopLevelNormalizerValueTest extends UnitTestCase {
     $field2->getIncludes()->willReturn(array_map(function ($included_item) {
       return $included_item->reveal();
     }, $included));
-    $context = [
-      // @todo Remove 'request' in https://www.drupal.org/project/jsonapi/issues/2965056.
-      'request' => new Request(),
-      'resource_type' => new ResourceType('node', 'article', NodeInterface::class),
-    ];
-    $entity = $this->prophesize(EntityInterface::class);
-    $entity->id()->willReturn(1);
-    $entity->isNew()->willReturn(FALSE);
-    $entity->getEntityTypeId()->willReturn('node');
-    $entity->bundle()->willReturn('article');
-    $entity->hasLinkTemplate(Argument::type('string'))->willReturn(TRUE);
-    $url = $this->prophesize(Url::class);
-    $url->toString()->willReturn('dummy_entity_link');
-    $url->setRouteParameter(Argument::any(), Argument::any())->willReturn($url->reveal());
-    $entity->toUrl(Argument::type('string'), Argument::type('array'))->willReturn($url->reveal());
-    $link_manager = $this->prophesize(LinkManager::class);
-    $link_manager
-      ->getEntityLink(Argument::any(), Argument::any(), Argument::type('array'), Argument::type('string'))
-      ->willReturn('dummy_entity_link');
     $this->object = $this->getMockBuilder(JsonApiDocumentTopLevelNormalizerValue::class)
       ->setMethods(['addCacheableDependency'])
       ->setConstructorArgs([
+        JsonApiDocumentTopLevelNormalizerValue::RESOURCE_OBJECT_DOCUMENT,
         ['title' => $field1->reveal(), 'field_related' => $field2->reveal()],
-        $context,
-        ['link_manager' => $link_manager->reveal()],
-        $entity->reveal(),
+        [],
+        1,
       ])
       ->getMock();
     $this->object->method('addCacheableDependency');

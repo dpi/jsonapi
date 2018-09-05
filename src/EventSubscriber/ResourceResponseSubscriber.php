@@ -4,8 +4,10 @@ namespace Drupal\jsonapi\EventSubscriber;
 
 use Drupal\Core\Cache\CacheableResponse;
 use Drupal\Core\Cache\CacheableResponseInterface;
+use Drupal\jsonapi\Context\FieldResolver;
 use Drupal\jsonapi\Normalizer\Value\JsonApiDocumentTopLevelNormalizerValue;
 use Drupal\jsonapi\ResourceResponse;
+use Drupal\jsonapi\ResourceType\ResourceType;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -109,11 +111,11 @@ class ResourceResponseSubscriber implements EventSubscriberInterface {
 
     // If there is data to send, serialize and set it as the response body.
     if ($data !== NULL) {
-      // First normalize the data.
-      $jsonapi_doc_object = $serializer->normalize($data, $format, [
-        'request' => $request,
-        'resource_type' => $request->get('resource_type'),
-      ]);
+      // First normalize the data. Note that error responses do not need a
+      // normalization context, since there are no entities to normalize.
+      // @see \Drupal\jsonapi\EventSubscriber\DefaultExceptionSubscriber::isJsonApiExceptionEvent()
+      $context = !$response->isSuccessful() ? [] : static::generateContext($request);
+      $jsonapi_doc_object = $serializer->normalize($data, $format, $context);
       // Having just normalized the data, we can associate its cacheability with
       // the response object.
       assert($jsonapi_doc_object instanceof JsonApiDocumentTopLevelNormalizerValue);
@@ -123,6 +125,52 @@ class ResourceResponseSubscriber implements EventSubscriberInterface {
       $response->setContent($serializer->encode($jsonapi_doc_object, $format));
       $response->headers->set('Content-Type', $request->getMimeType($format));
     }
+  }
+
+  /**
+   * Generates a top-level JSON API normalization context.
+   *
+   * @param \Symfony\Component\HttpFoundation\Request $request
+   *   The request from which the context can be derived.
+   *
+   * @return array
+   *   The generated context.
+   */
+  protected static function generateContext(Request $request) {
+    $resource_type = $request->get('resource_type');
+    assert($resource_type instanceof ResourceType);
+
+    // Translate ALL the includes from the public field names to the internal.
+    $includes = array_filter(explode(',', $request->query->get('include')));
+    // The primary resource type for 'related' routes is different than the
+    // primary resource type of individual and relationship routes and is
+    // determined by the relationship field name.
+    $related = $request->get('_on_relationship') ? FALSE : $request->get('related');
+    $internal_includes = array_map(function ($include) use ($resource_type, $related) {
+      $trimmed = trim($include);
+      // If the request is a related route, prefix the path with the related
+      // field name so that the path can be resolved from the base resource
+      // type. Then, remove it after the path is resolved.
+      $path_parts = explode('.', $related ? "{$related}.{$trimmed}" : $trimmed);
+      return array_map(function ($resolved) use ($related) {
+        return implode('.', $related ? array_slice($resolved, 1) : $resolved);
+      }, FieldResolver::resolveInternalIncludePath($resource_type, $path_parts));
+    }, $includes);
+    // Flatten the resolved possible include paths.
+    $internal_includes = array_reduce($internal_includes, 'array_merge', []);
+    // Build the expanded context.
+    $context = [
+      'account' => NULL,
+      'sparse_fieldset' => NULL,
+      'resource_type' => $resource_type,
+      'include' => $internal_includes,
+    ];
+    if ($request->query->get('fields')) {
+      $context['sparse_fieldset'] = array_map(function ($item) {
+        return explode(',', $item);
+      }, $request->query->get('fields'));
+    }
+    return $context;
   }
 
   /**

@@ -116,6 +116,8 @@ class EntityResource {
    *   The base JSON API resource type for the request to be served.
    * @param \Drupal\Core\Entity\EntityInterface $entity
    *   The loaded entity.
+   * @param \Symfony\Component\HttpFoundation\Request $request
+   *   The request object.
    *
    * @return \Drupal\jsonapi\ResourceResponse
    *   The response.
@@ -123,12 +125,12 @@ class EntityResource {
    * @throws \Drupal\jsonapi\Exception\EntityAccessDeniedHttpException
    *   Thrown when access to the entity is not allowed.
    */
-  public function getIndividual(ResourceType $resource_type, EntityInterface $entity) {
+  public function getIndividual(ResourceType $resource_type, EntityInterface $entity, Request $request) {
     $entity = static::getAccessCheckedEntity($entity);
     if ($entity instanceof EntityAccessDeniedHttpException) {
       throw $entity;
     }
-    $response = $this->buildWrappedResponse($entity);
+    $response = $this->buildWrappedResponse($entity, $request);
     return $response;
   }
 
@@ -233,7 +235,7 @@ class EntityResource {
     $entity->save();
 
     // Build response object.
-    $response = $this->buildWrappedResponse($entity, 201);
+    $response = $this->buildWrappedResponse($entity, $request, 201);
 
     // According to JSON API specification, when a new entity was created
     // we should send "Location" header to the frontend.
@@ -289,7 +291,7 @@ class EntityResource {
 
     $this->validate($entity, $field_names);
     $entity->save();
-    return $this->buildWrappedResponse($entity);
+    return $this->buildWrappedResponse($entity, $request);
   }
 
   /**
@@ -385,7 +387,7 @@ class EntityResource {
       $entity_collection->setTotalCount($total_results);
     }
 
-    $response = $this->respondWithCollection($entity_collection, $entity_type_id);
+    $response = $this->respondWithCollection($entity_collection, $resource_type, $request);
 
     $response->addCacheableDependency($query_cacheability);
 
@@ -401,11 +403,13 @@ class EntityResource {
    *   The requested entity.
    * @param string $related_field
    *   The related field name.
+   * @param \Symfony\Component\HttpFoundation\Request $request
+   *   The request object.
    *
    * @return \Drupal\jsonapi\ResourceResponse
    *   The response.
    */
-  public function getRelated(ResourceType $resource_type, FieldableEntityInterface $entity, $related_field) {
+  public function getRelated(ResourceType $resource_type, FieldableEntityInterface $entity, $related_field, Request $request) {
     /* @var \Drupal\Core\Field\EntityReferenceFieldItemListInterface $field_list */
     $field_list = $entity->get($resource_type->getInternalName($related_field));
 
@@ -427,7 +431,7 @@ class EntityResource {
       $collection_data[] = static::getAccessCheckedEntity($referenced_entity);
     }
     $entity_collection = new EntityCollection($collection_data, $field_list->getFieldDefinition()->getFieldStorageDefinition()->getCardinality());
-    $response = $this->buildWrappedResponse($entity_collection);
+    $response = $this->buildWrappedResponse($entity_collection, $request);
 
     // $response does not contain the entity list cache tag. We add the
     // cacheable metadata for the finite list of entities in the relationship.
@@ -456,7 +460,7 @@ class EntityResource {
   public function getRelationship(ResourceType $resource_type, FieldableEntityInterface $entity, $related_field, Request $request, $response_code = 200) {
     /* @var \Drupal\Core\Field\FieldItemListInterface $field_list */
     $field_list = $entity->get($resource_type->getInternalName($related_field));
-    $response = $this->buildWrappedResponse($field_list, $response_code);
+    $response = $this->buildWrappedResponse($field_list, $request, $response_code);
     // Add the host entity as a cacheable dependency.
     $response->addCacheableDependency($entity);
     return $response;
@@ -798,16 +802,23 @@ class EntityResource {
    *
    * @param mixed $data
    *   The data to wrap.
+   * @param \Symfony\Component\HttpFoundation\Request $request
+   *   The request object.
    * @param int $response_code
    *   The response code.
    * @param array $headers
    *   An array of response headers.
+   * @param string[] $links
+   *   The URLs to which to link. A 'self' link is added automatically.
+   * @param array $meta
+   *   (optional) The top-level metadata.
    *
    * @return \Drupal\jsonapi\ResourceResponse
    *   The response.
    */
-  protected function buildWrappedResponse($data, $response_code = 200, array $headers = []) {
-    return new ResourceResponse(new JsonApiDocumentTopLevel($data), $response_code, $headers);
+  protected function buildWrappedResponse($data, Request $request, $response_code = 200, array $headers = [], array $links = [], array $meta = []) {
+    $links['self'] = $this->linkManager->getRequestLink($request);
+    return new ResourceResponse(new JsonApiDocumentTopLevel($data, $links, $meta), $response_code, $headers);
   }
 
   /**
@@ -815,18 +826,28 @@ class EntityResource {
    *
    * @param \Drupal\jsonapi\JsonApiResource\EntityCollection $entity_collection
    *   The collection of entites.
-   * @param string $entity_type_id
-   *   The entity type.
+   * @param \Drupal\jsonapi\ResourceType\ResourceType $resource_type
+   *   The base JSON API resource type for the request to be served.
+   * @param \Symfony\Component\HttpFoundation\Request $request
+   *   The request object.
    *
    * @return \Drupal\jsonapi\ResourceResponse
    *   The response.
    */
-  protected function respondWithCollection(EntityCollection $entity_collection, $entity_type_id) {
-    $response = $this->buildWrappedResponse($entity_collection);
+  protected function respondWithCollection(EntityCollection $entity_collection, ResourceType $resource_type, Request $request) {
+    $link_context = [
+      'has_next_page' => $entity_collection->hasNextPage(),
+    ];
+    $meta = [];
+    if ($resource_type->includeCount()) {
+      $link_context['total_count'] = $meta['count'] = $entity_collection->getTotalCount();
+    }
+    $collection_links = $this->linkManager->getPagerLinks(\Drupal::request(), $link_context);
+    $response = $this->buildWrappedResponse($entity_collection, $request, 200, [], $collection_links, $meta);
 
     // When a new change to any entity in the resource happens, we cannot ensure
     // the validity of this cached list. Add the list tag to deal with that.
-    $list_tag = $this->entityTypeManager->getDefinition($entity_type_id)
+    $list_tag = $this->entityTypeManager->getDefinition($resource_type->getEntityTypeId())
       ->getListCacheTags();
     $response->getCacheableMetadata()->addCacheTags($list_tag);
     foreach ($entity_collection as $entity) {

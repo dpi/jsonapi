@@ -7,7 +7,6 @@ use Drupal\Component\Uuid\Uuid;
 use Drupal\Core\Access\AccessResult;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Field\EntityReferenceFieldItemListInterface;
-use Drupal\jsonapi\Context\FieldResolver;
 use Drupal\jsonapi\Exception\EntityAccessDeniedHttpException;
 use Drupal\jsonapi\JsonApiResource\ErrorCollection;
 use Drupal\jsonapi\Normalizer\Value\JsonApiDocumentTopLevelNormalizerValue;
@@ -15,7 +14,6 @@ use Drupal\jsonapi\JsonApiResource\EntityCollection;
 use Drupal\jsonapi\LinkManager\LinkManager;
 use Drupal\jsonapi\JsonApiResource\JsonApiDocumentTopLevel;
 use Drupal\jsonapi\ResourceType\ResourceType;
-use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 use Symfony\Component\HttpKernel\Exception\UnprocessableEntityHttpException;
@@ -180,93 +178,27 @@ class JsonApiDocumentTopLevelNormalizer extends NormalizerBase implements Denorm
       $normalizer_values = array_map(function (HttpExceptionInterface $exception) use ($format, $context, $serializer) {
         return $serializer->normalize($exception, $format, $context);
       }, (array) $data->getIterator());
-      return new JsonApiDocumentTopLevelNormalizerValue($normalizer_values, ['is_error_document' => TRUE], [], FALSE);
-    }
-
-    if (empty($context['expanded'])) {
-      $context += $this->expandContext($context['request'], $context['resource_type']);
+      return new JsonApiDocumentTopLevelNormalizerValue(JsonApiDocumentTopLevelNormalizerValue::ERROR_DOCUMENT, $normalizer_values, [], FALSE, $object->getMeta());
     }
 
     if ($data instanceof EntityReferenceFieldItemListInterface) {
       $normalizer_values = [
         $this->serializer->normalize($data, $format, $context),
       ];
-      $link_context = ['link_manager' => $this->linkManager];
       // RelationshipNormalizerValues already handle single vs multiple
       // multiple cardinality fields.
       $cardinality = 1;
-      return new JsonApiDocumentTopLevelNormalizerValue($normalizer_values, $context, $link_context, $cardinality);
+      return new JsonApiDocumentTopLevelNormalizerValue(JsonApiDocumentTopLevelNormalizerValue::RESOURCE_OBJECT_DOCUMENT, $normalizer_values, [], $cardinality, $object->getMeta());
     }
     $is_collection = $data instanceof EntityCollection;
-    $include_count = $context['resource_type']->includeCount();
     // To improve the logical workflow deal with an array at all times.
     $entities = $is_collection ? $data->toArray() : [$data];
-    $context['has_next_page'] = $is_collection ? $data->hasNextPage() : FALSE;
-
-    if ($include_count) {
-      $context['total_count'] = $is_collection ? $data->getTotalCount() : 1;
-    }
     $normalizer_values = array_map(function ($entity) use ($format, $context, $serializer) {
       return $serializer->normalize($entity, $format, $context);
     }, $entities);
 
-    $link_context = [
-      'link_manager' => $this->linkManager,
-      'has_next_page' => $context['has_next_page'],
-    ];
-
-    if ($include_count) {
-      $link_context['total_count'] = $context['total_count'];
-    }
-
-    return new JsonApiDocumentTopLevelNormalizerValue($normalizer_values, $context, $link_context, $is_collection ? $data->getCardinality() : 1);
-  }
-
-  /**
-   * Expand the context information based on the current request context.
-   *
-   * @param \Symfony\Component\HttpFoundation\Request $request
-   *   The request to get the URL params from to expand the context.
-   * @param \Drupal\jsonapi\ResourceType\ResourceType $resource_type
-   *   The resource type to translate to internal fields.
-   *
-   * @return array
-   *   The expanded context.
-   */
-  protected function expandContext(Request $request, ResourceType $resource_type) {
-    // Translate ALL the includes from the public field names to the internal.
-    $includes = array_filter(explode(',', $request->query->get('include')));
-    // The primary resource type for 'related' routes is different than the
-    // primary resource type of individual and relationship routes and is
-    // determined by the relationship field name.
-    $related = $request->get('_on_relationship') ? FALSE : $request->get('related');
-    $internal_includes = array_map(function ($include) use ($resource_type, $related) {
-      $trimmed = trim($include);
-      // If the request is a related route, prefix the path with the related
-      // field name so that the path can be resolved from the base resource
-      // type. Then, remove it after the path is resolved.
-      $path_parts = explode('.', $related ? "{$related}.{$trimmed}" : $trimmed);
-      return array_map(function ($resolved) use ($related) {
-        return implode('.', $related ? array_slice($resolved, 1) : $resolved);
-      }, FieldResolver::resolveInternalIncludePath($resource_type, $path_parts));
-    }, $includes);
-    // Flatten the resolved possible include paths.
-    $internal_includes = array_reduce($internal_includes, 'array_merge', []);
-    // Build the expanded context.
-    $context = [
-      'account' => NULL,
-      'sparse_fieldset' => NULL,
-      'resource_type' => NULL,
-      'include' => $internal_includes,
-      'expanded' => TRUE,
-    ];
-    if ($request->query->get('fields')) {
-      $context['sparse_fieldset'] = array_map(function ($item) {
-        return explode(',', $item);
-      }, $request->query->get('fields'));
-    }
-
-    return $context;
+    $cardinality = $is_collection ? $data->getCardinality() : 1;
+    return new JsonApiDocumentTopLevelNormalizerValue(JsonApiDocumentTopLevelNormalizerValue::RESOURCE_OBJECT_DOCUMENT, $normalizer_values, $object->getLinks(), $cardinality, $object->getMeta());
   }
 
   /**

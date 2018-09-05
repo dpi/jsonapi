@@ -2,6 +2,7 @@
 
 namespace Drupal\jsonapi\Normalizer\Value;
 
+use Drupal\Component\Assertion\Inspector;
 use Drupal\Component\Utility\NestedArray;
 use Drupal\Core\Cache\RefinableCacheableDependencyInterface;
 use Drupal\Core\Cache\RefinableCacheableDependencyTrait;
@@ -16,6 +17,10 @@ class JsonApiDocumentTopLevelNormalizerValue implements ValueExtractorInterface,
 
   use RefinableCacheableDependencyTrait;
 
+  const RESOURCE_OBJECT_DOCUMENT = 'resource_object_document';
+
+  const ERROR_DOCUMENT = 'error_document';
+
   /**
    * The values.
    *
@@ -24,14 +29,17 @@ class JsonApiDocumentTopLevelNormalizerValue implements ValueExtractorInterface,
   protected $values;
 
   /**
-   * Whether this is an errors document or not.
+   * The type of document that this instance is..
    *
-   * @var bool
+   * The spec says the top-level `data` and `errors` members MUST NOT coexist,
+   * therefore, a document can either be a "resource object document" or an
+   * "error document".
    *
-   * (The spec says the top-level `data` and `errors` members MUST NOT coexist.)
+   * @var string
+   *
    * @see http://jsonapi.org/format/#document-top-level
    */
-  protected $isErrorsDocument;
+  protected $documentType;
 
   /**
    * The includes.
@@ -41,11 +49,11 @@ class JsonApiDocumentTopLevelNormalizerValue implements ValueExtractorInterface,
   protected $includes;
 
   /**
-   * The resource path.
+   * The links. Keys are link relation types.
    *
-   * @var array
+   * @var string[]
    */
-  protected $context;
+  protected $links;
 
   /**
    * The cardinality of the document's primary data.
@@ -55,44 +63,42 @@ class JsonApiDocumentTopLevelNormalizerValue implements ValueExtractorInterface,
   protected $cardinality;
 
   /**
-   * The link manager.
-   *
-   * @var \Drupal\jsonapi\LinkManager\LinkManager
-   */
-  protected $linkManager;
-
-  /**
-   * The link context.
+   * The metadata.
    *
    * @var array
    */
-  protected $linkContext;
+  protected $meta;
 
   /**
    * Instantiates a JsonApiDocumentTopLevelNormalizerValue object.
    *
+   * @param string $document_type
+   *   The document's type. Use either the self::RESOURCE_OBJECT_DOCUMENT or
+   *   self::ERROR_DOCUMENT class constant.
    * @param \Drupal\Core\Entity\EntityInterface[] $values
    *   The data to normalize. It can be either a straight up entity or a
    *   collection of entities.
-   * @param array $context
-   *   The context.
-   * @param array $link_context
-   *   All the objects and variables needed to generate the links for this
-   *   relationship.
-   * @param int $cardinality
+   * @param string[] $links
+   *   The URLs to which to link.
+   * @param int|bool $cardinality
    *   The cardinality of the document's primary data. -1 for unlimited
    *   cardinality. For example, an individual resource would have a cardinality
    *   of 1. A related resource would have a cardinality of -1 for a to-many
-   *   relationship, but a cardinality of 1 for a to-one relationship.
+   *   relationship, but a cardinality of 1 for a to-one relationship. Required
+   *   for resource object documents.
+   * @param array $meta
+   *   (optional) The metadata to normalize.
    */
-  public function __construct(array $values, array $context, array $link_context, $cardinality) {
+  public function __construct($document_type, array $values, array $links, $cardinality = FALSE, array $meta = []) {
+    assert(in_array($document_type, [static::RESOURCE_OBJECT_DOCUMENT, static::ERROR_DOCUMENT]));
+    assert(is_int($cardinality) || $document_type === static::ERROR_DOCUMENT);
+    $this->documentType = $document_type;
     $this->values = $values;
     array_walk($values, [$this, 'addCacheableDependency']);
-    $this->isErrorsDocument = !empty($context['is_error_document']);
 
-    if (!$this->isErrorsDocument) {
+    if (!$this->isErrorDocument()) {
       // @todo Make this unconditional in https://www.drupal.org/project/jsonapi/issues/2965056.
-      if (!$context['request']->get('_on_relationship')) {
+      if (!\Drupal::requestStack()->getCurrentRequest()->get('_on_relationship')) {
         // Make sure that different sparse fieldsets are cached differently.
         $this->addCacheContexts(array_map(function ($query_parameter_name) {
           return sprintf('url.query_args:%s', $query_parameter_name);
@@ -100,13 +106,14 @@ class JsonApiDocumentTopLevelNormalizerValue implements ValueExtractorInterface,
       }
       // Every JSON API document contains absolute URLs.
       $this->addCacheContexts(['url.site']);
-      $this->context = $context;
 
       $this->cardinality = $cardinality;
-      $this->linkManager = $link_context['link_manager'];
-      // Remove the manager and store the link context.
-      unset($link_context['link_manager']);
-      $this->linkContext = $link_context;
+
+      assert(Inspector::assertAllStrings($links));
+      $this->links = $links;
+
+      $this->meta = $meta;
+
       // Get an array of arrays of includes.
       $this->includes = array_map(function ($value) {
         return $value->getIncludes();
@@ -119,6 +126,7 @@ class JsonApiDocumentTopLevelNormalizerValue implements ValueExtractorInterface,
       // Filter the empty values.
       $this->includes = array_filter($this->includes);
     }
+    $this->documentType = $document_type;
   }
 
   /**
@@ -127,7 +135,7 @@ class JsonApiDocumentTopLevelNormalizerValue implements ValueExtractorInterface,
   public function rasterizeValue() {
     // Determine which of the two mutually exclusive top-level document members
     // should be used.
-    $mutually_exclusive_member = $this->isErrorsDocument ? 'errors' : 'data';
+    $mutually_exclusive_member = $this->isErrorDocument() ? 'errors' : 'data';
     $rasterized = [
       $mutually_exclusive_member => [],
       'jsonapi' => [
@@ -137,15 +145,18 @@ class JsonApiDocumentTopLevelNormalizerValue implements ValueExtractorInterface,
         ],
       ],
     ];
+    if (!empty($this->meta)) {
+      $rasterized['meta'] = $this->meta;
+    }
 
-    if ($this->isErrorsDocument) {
+    if ($this->isErrorDocument()) {
       foreach ($this->values as $normalized_exception) {
         $rasterized['errors'] = array_merge($rasterized['errors'], $normalized_exception->rasterizeValue());
       }
       return $rasterized;
     }
 
-    $rasterized['links'] = [];
+    $rasterized['links'] = $this->links;
 
     $uuid_generator = \Drupal::service('uuid');
     foreach ($this->values as $normalizer_value) {
@@ -192,27 +203,6 @@ class JsonApiDocumentTopLevelNormalizerValue implements ValueExtractorInterface,
     }
     else {
       $rasterized['data'] = empty($rasterized['data']) ? NULL : reset($rasterized['data']);
-    }
-
-    // Add the self link.
-    if ($this->context['request']) {
-      /* @var \Symfony\Component\HttpFoundation\Request $request */
-      $request = $this->context['request'];
-      $rasterized['links'] += [
-        'self' => $this->linkManager->getRequestLink($request),
-      ];
-      if ($this->cardinality !== 1) {
-        // Add the pager links.
-        $rasterized['links'] += $this->linkManager->getPagerLinks($request, $this->linkContext);
-
-        // Add the pre-calculated total count to the meta section.
-        if (isset($this->context['total_count'])) {
-          $rasterized = NestedArray::mergeDeepArray([
-            $rasterized,
-            ['meta' => ['count' => $this->context['total_count']]],
-          ]);
-        }
-      }
     }
 
     // This is the top-level JSON API document, therefore the rasterized value
@@ -282,6 +272,16 @@ class JsonApiDocumentTopLevelNormalizerValue implements ValueExtractorInterface,
     return array_map(function ($include) {
       return $include->rasterizeValue();
     }, $this->getIncludes());
+  }
+
+  /**
+   * Whether this is an errors document or not.
+   *
+   * @return bool
+   *   TRUE if the document contains top-level errors, FALSE otherwise.
+   */
+  protected function isErrorDocument() {
+    return $this->documentType === static::ERROR_DOCUMENT;
   }
 
 }

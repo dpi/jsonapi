@@ -52,7 +52,7 @@ class DefaultExceptionSubscriber extends SerializationDefaultExceptionSubscriber
   protected function setEventResponse(GetResponseForExceptionEvent $event, $status) {
     /* @var \Symfony\Component\HttpKernel\Exception\HttpException $exception */
     $exception = $event->getException();
-    $response = new ResourceResponse(new JsonApiDocumentTopLevel(new ErrorCollection([$exception])), $exception->getStatusCode(), $exception->getHeaders());
+    $response = new ResourceResponse(new JsonApiDocumentTopLevel(new ErrorCollection([$exception]), []), $exception->getStatusCode(), $exception->getHeaders());
     $response->addCacheableDependency($exception);
     $event->setResponse($response);
   }

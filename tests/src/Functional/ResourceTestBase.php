@@ -344,11 +344,12 @@ abstract class ResourceTestBase extends BrowserTestBase {
    *   The JSON API normalization for the given entity.
    */
   protected function normalize(EntityInterface $entity, Url $url) {
-    return $this->serializer->normalize(new JsonApiDocumentTopLevel($entity), 'api_json', [
+    $doc = new JsonApiDocumentTopLevel($entity, [
+      'self' => $url->toString(TRUE)->getGeneratedUrl(),
+    ]);
+    return $this->serializer->normalize($doc, 'api_json', [
       'resource_type' => $this->container->get('jsonapi.resource_type.repository')->getByTypeName(static::$resourceTypeName),
-      // Pass a Request object to the normalizer; this will be considered the
-      // "current request" for generating the "self" link.
-      'request' => Request::create($url->toString(TRUE)->getGeneratedUrl()),
+      'account' => $this->account,
     ])->rasterizeValue();
   }
 

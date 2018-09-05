@@ -60,7 +60,7 @@ class RelationshipItemNormalizer extends FieldItemNormalizer {
     if (!empty($context['include']) && in_array($host_field_name, $context['include']) && $target_entity !== NULL) {
       $context = $this->buildSubContext($context, $target_entity, $host_field_name);
       $entity = EntityResource::getAccessCheckedEntity($target_entity);
-      $included_normalizer_value = $this->serializer->normalize(new JsonApiDocumentTopLevel($entity), $format, $context);
+      $included_normalizer_value = $this->serializer->normalize(new JsonApiDocumentTopLevel($entity, []), $format, $context);
     }
     else {
       $included_normalizer_value = NULL;
