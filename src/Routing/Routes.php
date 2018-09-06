@@ -349,4 +349,12 @@ class Routes implements ContainerInjectionInterface {
     return NULL;
   }
 
+  /**
+   * Invalidates any JSON API resource type dependent responses and routes.
+   */
+  public static function rebuild() {
+    \Drupal::service('cache_tags.invalidator')->invalidateTags(['jsonapi_resource_types']);
+    \Drupal::service('router.builder')->setRebuildNeeded();
+  }
+
 }

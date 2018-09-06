@@ -297,8 +297,7 @@ abstract class ResourceTestBase extends BrowserTestBase {
       ->setTranslatable(FALSE)
       ->save();
 
-    \Drupal::service('jsonapi.resource_type.repository')->clearCachedDefinitions();
-    \Drupal::service('router.builder')->rebuild();
+    \Drupal::service('router.builder')->rebuildIfNeeded();
 
     // Reload entity so that it has the new field.
     $reloaded_entity = $this->entityStorage->loadUnchanged($entity->id());

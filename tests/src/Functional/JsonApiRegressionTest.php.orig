@@ -5,11 +5,10 @@ namespace Drupal\Tests\jsonapi\Functional;
 use Drupal\comment\Entity\Comment;
 use Drupal\comment\Plugin\Field\FieldType\CommentItemInterface;
 use Drupal\comment\Tests\CommentTestTrait;
+use Drupal\Component\Serialization\Json;
 use Drupal\Core\Field\FieldStorageDefinitionInterface;
 use Drupal\Core\Url;
-use Drupal\field\Entity\FieldConfig;
 use Drupal\node\Entity\Node;
-use Drupal\node\Entity\NodeType;
 use Drupal\taxonomy\Entity\Term;
 use Drupal\taxonomy\Entity\Vocabulary;
 use GuzzleHttp\RequestOptions;
@@ -436,62 +435,6 @@ class JsonApiRegressionTest extends JsonApiFunctionalTestBase {
         'id' => $conference_node->uuid(),
       ],
     ], Json::decode((string) $response->getBody())['data']['relationships']['field_mentioned_in']['data']);
-  }
-
-  /**
-   * Ensures that JSON API routes are caches are dynamically rebuilt.
-   *
-   * Adding a new relationship field should cause new routes to be immediately
-   * regenerated. The site builder should not need to manually rebuild caches.
-   *
-   * @see https://www.drupal.org/project/jsonapi/issues/2984886
-   */
-  public function testThatRoutesAreRebuiltAfterDataModelChangesFromIssue2984886() {
-    $user = $this->drupalCreateUser(['access content']);
-    $request_options = [
-      RequestOptions::AUTH => [
-        $user->getUsername(),
-        $user->pass_raw,
-      ],
-    ];
-
-    $response = $this->request('GET', Url::fromUri('internal:/jsonapi/node/dog'), $request_options);
-    $this->assertSame(404, $response->getStatusCode());
-
-    ($node_type_dog = NodeType::create(['type' => 'dog']))->save();
-    ($node_type_cat = NodeType::create(['type' => 'cat']))->save();
-    \Drupal::service('router.builder')->rebuildIfNeeded();
-
-    $response = $this->request('GET', Url::fromUri('internal:/jsonapi/node/dog'), $request_options);
-    $this->assertSame(200, $response->getStatusCode());
-
-    $this->createEntityReferenceField('node', 'dog', 'field_test', NULL, 'node');
-    \Drupal::service('router.builder')->rebuildIfNeeded();
-
-    ($dog = Node::create(['type' => 'dog', 'title' => 'Rosie P. Mosie']))->save();
-
-    $response = $this->request('GET', Url::fromUri('internal:/jsonapi/node/dog/' . $dog->uuid() . '/field_test'), $request_options);
-    $this->assertSame(200, $response->getStatusCode());
-
-    $this->createEntityReferenceField('node', 'cat', 'field_test', NULL, 'node');
-    \Drupal::service('router.builder')->rebuildIfNeeded();
-
-    ($cat = Node::create(['type' => 'cat', 'title' => 'E. Napoleon']))->save();
-
-    $response = $this->request('GET', Url::fromUri('internal:/jsonapi/node/cat/' . $cat->uuid() . '/field_test'), $request_options);
-    $this->assertSame(200, $response->getStatusCode());
-
-    FieldConfig::loadByName('node', 'cat', 'field_test')->delete();
-    \Drupal::service('router.builder')->rebuildIfNeeded();
-
-    $response = $this->request('GET', Url::fromUri('internal:/jsonapi/node/cat/' . $cat->uuid() . '/field_test'), $request_options);
-    $this->assertSame(404, $response->getStatusCode());
-
-    $node_type_dog->delete();
-    \Drupal::service('router.builder')->rebuildIfNeeded();
-
-    $response = $this->request('GET', Url::fromUri('internal:/jsonapi/node/dog'), $request_options);
-    $this->assertSame(404, $response->getStatusCode());
   }
 
 }

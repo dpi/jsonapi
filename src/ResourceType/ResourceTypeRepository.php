@@ -3,6 +3,8 @@
 namespace Drupal\jsonapi\ResourceType;
 
 use Drupal\Component\Assertion\Inspector;
+use Drupal\Core\Cache\Cache;
+use Drupal\Core\Cache\CacheBackendInterface;
 use Drupal\Core\Config\Entity\ConfigEntityTypeInterface;
 use Drupal\Core\Entity\ContentEntityNullStorage;
 use Drupal\Core\Entity\ContentEntityTypeInterface;
@@ -55,11 +57,11 @@ class ResourceTypeRepository implements ResourceTypeRepositoryInterface {
   protected $entityFieldManager;
 
   /**
-   * All JSON API resource types.
+   * The static cache backend.
    *
-   * @var \Drupal\jsonapi\ResourceType\ResourceType[]
+   * @var \Drupal\Core\Cache\CacheBackendInterface
    */
-  protected $all = [];
+  protected $staticCache;
 
   /**
    * Class to instantiate for resource type objects.
@@ -77,30 +79,27 @@ class ResourceTypeRepository implements ResourceTypeRepositoryInterface {
    *   The entity type bundle info service.
    * @param \Drupal\Core\Entity\EntityFieldManagerInterface $entity_field_manager
    *   The entity field manager.
+   * @param \Drupal\Core\Cache\CacheBackendInterface $static_cache
+   *   The static cache backend.
    */
-  public function __construct(EntityTypeManagerInterface $entity_type_manager, EntityTypeBundleInfoInterface $entity_bundle_info, EntityFieldManagerInterface $entity_field_manager) {
+  public function __construct(EntityTypeManagerInterface $entity_type_manager, EntityTypeBundleInfoInterface $entity_bundle_info, EntityFieldManagerInterface $entity_field_manager, CacheBackendInterface $static_cache) {
     $this->entityTypeManager = $entity_type_manager;
     $this->entityTypeBundleInfo = $entity_bundle_info;
     $this->entityFieldManager = $entity_field_manager;
+    $this->staticCache = $static_cache;
   }
-
-  // @codingStandardsIgnoreStart
-  // @todo implement \Drupal\Core\Plugin\CachedDiscoveryClearerInterface?
-  // @todo implement \Drupal\Component\Plugin\Discovery\DiscoveryInterface?
-  public function clearCachedDefinitions() {
-    $this->all = [];
-  }
-  // @codingStandardsIgnoreEnd
 
   /**
    * {@inheritdoc}
    */
   public function all() {
-    if (!$this->all) {
+    $cached = $this->staticCache->get('jsonapi.resource_types', FALSE);
+    if ($cached === FALSE) {
       $entity_type_ids = array_keys($this->entityTypeManager->getDefinitions());
+      $resource_types = [];
       foreach ($entity_type_ids as $entity_type_id) {
         $resource_type_class = static::RESOURCE_TYPE_CLASS;
-        $this->all = array_merge($this->all, array_map(function ($bundle) use ($entity_type_id, $resource_type_class) {
+        $resource_types = array_merge($resource_types, array_map(function ($bundle) use ($entity_type_id, $resource_type_class) {
           $entity_type = $this->entityTypeManager->getDefinition($entity_type_id);
           $raw_fields = $this->getAllFieldNames($entity_type, $bundle);
           return new $resource_type_class(
@@ -114,12 +113,13 @@ class ResourceTypeRepository implements ResourceTypeRepositoryInterface {
           );
         }, array_keys($this->entityTypeBundleInfo->getBundleInfo($entity_type_id))));
       }
-      foreach ($this->all as $resource_type) {
-        $relatable_resource_types = $this->calculateRelatableResourceTypes($resource_type);
+      foreach ($resource_types as $resource_type) {
+        $relatable_resource_types = $this->calculateRelatableResourceTypes($resource_type, $resource_types);
         $resource_type->setRelatableResourceTypes($relatable_resource_types);
       }
+      $this->staticCache->set('jsonapi.resource_types', $resource_types, Cache::PERMANENT, ['jsonapi_resource_types']);
     }
-    return $this->all;
+    return $cached ? $cached->data : $resource_types;
   }
 
   /**
@@ -290,11 +290,13 @@ class ResourceTypeRepository implements ResourceTypeRepositoryInterface {
    *
    * @param \Drupal\jsonapi\ResourceType\ResourceType $resource_type
    *   The resource type repository.
+   * @param \Drupal\jsonapi\ResourceType\ResourceType[] $resource_types
+   *   A list of JSON API resource types.
    *
    * @return array
    *   The relatable JSON API resource types, keyed by field name.
    */
-  protected function calculateRelatableResourceTypes(ResourceType $resource_type) {
+  protected function calculateRelatableResourceTypes(ResourceType $resource_type, array $resource_types) {
     // For now, only fieldable entity types may contain relationships.
     $entity_type = $this->entityTypeManager->getDefinition($resource_type->getEntityTypeId());
     if ($entity_type->entityClassImplements(FieldableEntityInterface::class)) {
@@ -303,8 +305,8 @@ class ResourceTypeRepository implements ResourceTypeRepositoryInterface {
         $resource_type->getBundle()
       );
 
-      $relatable_internal = array_map(function ($field_definition) {
-        return $this->getRelatableResourceTypesFromFieldDefinition($field_definition);
+      $relatable_internal = array_map(function ($field_definition) use ($resource_types) {
+        return $this->getRelatableResourceTypesFromFieldDefinition($field_definition, $resource_types);
       }, array_filter($field_definitions, function ($field_definition) {
         return $this->isReferenceFieldDefinition($field_definition);
       }));
@@ -321,15 +323,17 @@ class ResourceTypeRepository implements ResourceTypeRepositoryInterface {
   /**
    * Get relatable resource types from a field definition.
    *
-   * @var \Drupal\Core\Field\FieldDefinitionInterface $field_definition
+   * @param \Drupal\Core\Field\FieldDefinitionInterface $field_definition
    *   The field definition from which to calculate relatable JSON API resource
    *   types.
+   * @param \Drupal\jsonapi\ResourceType\ResourceType[] $resource_types
+   *   A list of JSON API resource types.
    *
    * @return \Drupal\jsonapi\ResourceType\ResourceType[]
    *   The JSON API resource types with which the given field may have a
    *   relationship.
    */
-  protected function getRelatableResourceTypesFromFieldDefinition(FieldDefinitionInterface $field_definition) {
+  protected function getRelatableResourceTypesFromFieldDefinition(FieldDefinitionInterface $field_definition, array $resource_types) {
     $item_definition = $field_definition->getItemDefinition();
 
     $entity_type_id = $item_definition->getSetting('target_type');
@@ -340,8 +344,12 @@ class ResourceTypeRepository implements ResourceTypeRepositoryInterface {
       $handler_settings['target_bundles']
       : $this->getAllBundlesForEntityType($entity_type_id);
 
-    return array_map(function ($target_bundle) use ($entity_type_id) {
-      return $this->get($entity_type_id, $target_bundle);
+    return array_map(function ($target_bundle) use ($entity_type_id, $resource_types) {
+      foreach ($resource_types as $resource_type) {
+        if ($resource_type->getEntityTypeId() === $entity_type_id && $resource_type->getBundle() === $target_bundle) {
+          return $resource_type;
+        }
+      }
     }, $target_bundles);
   }
 

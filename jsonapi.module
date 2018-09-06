@@ -6,7 +6,9 @@
  */
 
 use Drupal\Core\Routing\RouteMatchInterface;
+use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Entity\EntityTypeInterface;
+use Drupal\jsonapi\Routing\Routes as JsonApiRoutes;
 
 /**
  * Implements hook_help().
@@ -43,4 +45,38 @@ function jsonapi_entity_bundle_field_info(EntityTypeInterface $entity_type, $bun
   }
 
   return $fields;
+}
+
+/**
+ * Implements hook_entity_bundle_create().
+ */
+function jsonapi_entity_bundle_create() {
+  JsonApiRoutes::rebuild();
+}
+
+/**
+ * Implements hook_entity_bundle_delete().
+ */
+function jsonapi_entity_bundle_delete() {
+  JsonApiRoutes::rebuild();
+}
+
+/**
+ * Implements hook_entity_create().
+ */
+function jsonapi_entity_create(EntityInterface $entity) {
+  if (in_array($entity->getEntityTypeId(), ['field_storage_config', 'field_config'])) {
+    // @todo: only do this when relationship fields are updated, not just any field.
+    JsonApiRoutes::rebuild();
+  }
+}
+
+/**
+ * Implements hook_entity_delete().
+ */
+function jsonapi_entity_delete(EntityInterface $entity) {
+  if (in_array($entity->getEntityTypeId(), ['field_storage_config', 'field_config'])) {
+    // @todo: only do this when relationship fields are updated, not just any field.
+    JsonApiRoutes::rebuild();
+  }
 }

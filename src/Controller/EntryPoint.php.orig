@@ -90,6 +90,9 @@ class EntryPoint extends ControllerBase {
       });
 
       return array_reduce($resources, function (array $carry, ResourceType $resource_type) {
+        // TODO: Learn how to invalidate the cache for this page when a new
+        // entity type or bundle gets added, removed or updated.
+        // $this->response->addCacheableDependency($definition);
         if ($resource_type->isLocatable() || $resource_type->isMutable()) {
           $route_suffix = $resource_type->isLocatable() ? 'collection' : 'collection.post';
           $url = Url::fromRoute(sprintf('jsonapi.%s.%s', $resource_type->getTypeName(), $route_suffix))->setAbsolute();
@@ -105,10 +108,7 @@ class EntryPoint extends ControllerBase {
       'data' => [],
       'links' => $urls,
     ];
-    $json_response->addCacheableDependency((new CacheableMetadata())
-      ->addCacheContexts(['user.roles:authenticated'])
-      ->addCacheTags(['jsonapi_resource_types'])
-    );
+    $json_response->addCacheableDependency((new CacheableMetadata())->addCacheContexts(['user.roles:authenticated']));
     if ($this->user->isAuthenticated()) {
       $me_url = Url::fromRoute('jsonapi.user--user.individual', ['entity' => User::load($this->user->id())->uuid()])
         ->setAbsolute()
