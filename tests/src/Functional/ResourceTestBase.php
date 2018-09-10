@@ -1797,10 +1797,7 @@ abstract class ResourceTestBase extends BrowserTestBase {
           unset($resource_document['meta']['omitted']['links'][$link_key]);
         }
       }
-      // Don't add the omitted member if only the 'help' link remains.
-      if (count($resource_document['meta']['omitted']['links']) > 1) {
-        $expected_document['meta']['omitted'] = $resource_document['meta']['omitted'];
-      }
+      static::addOmittedObject($expected_document, $resource_document['meta']['omitted']);
     }
     return $expected_response = (new ResourceResponse($expected_document))
       ->addCacheableDependency($individual_response->getCacheableMetadata())
@@ -2383,42 +2380,6 @@ abstract class ResourceTestBase extends BrowserTestBase {
   }
 
   /**
-   * Sorts an omitted link object array by href.
-   *
-   * @param array $omitted
-   *   An array of JSON API omitted link objects.
-   */
-  protected static function sortOmittedLinks(array &$omitted) {
-    $help = $omitted['links']['help'];
-    $links = array_diff_key($omitted['links'], array_flip(['help']));
-    uasort($links, function ($a, $b) {
-      return strcmp($a['href'], $b['href']);
-    });
-    $omitted['links'] = ['help' => $help] + $links;
-  }
-
-  /**
-   * Resets omitted link keys.
-   *
-   * Omitted link keys are a link relation type + a random string. This string
-   * is meaningless and only serves to differentiate link objects. Given that
-   * these are random, we can't assert their value.
-   *
-   * @param array $omitted
-   *   An array of JSON API omitted link objects.
-   */
-  protected static function resetOmittedLinkKeys(array &$omitted) {
-    $i = 0;
-    foreach ($omitted['links'] as $key => $link) {
-      if ($key !== 'help') {
-        unset($omitted['links'][$key]);
-        $omitted['links']["item:$i"] = $link;
-        $i++;
-      }
-    }
-  }
-
-  /**
    * Returns Guzzle request options for authentication.
    *
    * @return array
@@ -2665,19 +2626,14 @@ abstract class ResourceTestBase extends BrowserTestBase {
       $related_document = $related_response->getResponseData();
       $expected_cacheability->addCacheableDependency($related_response->getCacheableMetadata());
       $expected_cacheability->setCacheTags(array_values(array_diff($expected_cacheability->getCacheTags(), ['4xx-response'])));
-      if (!empty($related_document['meta']['omitted']['links'])) {
-        if (!isset($expected_document['meta']['omitted'])) {
-          $expected_document['meta']['omitted'] = $related_document['meta']['omitted'];
-        }
-        else {
-          // If any of the related response documents had omitted items, we
-          // should later expect the document to have those omitted items too.
-          foreach ($related_document['meta']['omitted']['links'] as $link_key => $link) {
-            if ($link_key !== 'help') {
-              $expected_document['meta']['omitted']['links'][$link_key] = $link;
-            }
-          }
-        }
+      // If any of the related response documents had omitted items or errors,
+      // we should later expect the document to have omitted items as well.
+      if (!empty($related_document['errors'])) {
+        // @todo uncomment this when inaccessible relationships are able to raise errors in https://www.drupal.org/project/jsonapi/issues/2956084.
+        /* static::addOmittedObject($expected_document, static::errorsToOmittedObject($related_document['errors'])); */
+      }
+      if (!empty($related_document['meta']['omitted'])) {
+        static::addOmittedObject($expected_document, $related_document['meta']['omitted']);
       }
       if (isset($related_document['data'])) {
         $related_data = $related_document['data'];

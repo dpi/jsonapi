@@ -3,6 +3,7 @@
 namespace Drupal\jsonapi\Normalizer\Value;
 
 use Drupal\Component\Assertion\Inspector;
+use Drupal\Component\Utility\Crypt;
 use Drupal\Component\Utility\NestedArray;
 use Drupal\Core\Cache\RefinableCacheableDependencyInterface;
 use Drupal\Core\Cache\RefinableCacheableDependencyTrait;
@@ -158,7 +159,7 @@ class JsonApiDocumentTopLevelNormalizerValue implements ValueExtractorInterface,
 
     $rasterized['links'] = $this->links;
 
-    $uuid_generator = \Drupal::service('uuid');
+    $link_hash_salt = Crypt::randomBytesBase64();
     foreach ($this->values as $normalizer_value) {
       if ($normalizer_value instanceof HttpExceptionNormalizerValue) {
         if (!isset($rasterized['meta']['omitted'])) {
@@ -173,10 +174,12 @@ class JsonApiDocumentTopLevelNormalizerValue implements ValueExtractorInterface,
         foreach ($normalizer_value->rasterizeValue() as $error) {
           // JSON API links cannot be arrays and the spec generally favors link
           // relation types as keys. 'item' is the right link relation type, but
-          // we need multiple values. So, we're just generating a meaningless,
-          // random value to use as a unique key. We don't use the UUID directly
-          // so as not to imply that it's an identifier for the error.
-          $link_key = 'item:' . substr(str_replace('-', '', $uuid_generator->generate()), 0, 7);
+          // we need multiple values. To do that, we generate a meaningless,
+          // random value to use as a unique key. That value is a hash of a
+          // random salt and the link href. This ensures that the key is non-
+          // deterministic while letting use deduplicate the links by their
+          // href. The salt is *not* used for any cryptographic reason.
+          $link_key = 'item:' . static::getLinkHash($link_hash_salt, $error['links']['via']);
           $rasterized['meta']['omitted']['links'][$link_key] = [
             'href' => $error['links']['via'],
             'meta' => [
@@ -221,8 +224,9 @@ class JsonApiDocumentTopLevelNormalizerValue implements ValueExtractorInterface,
           }
           if (!empty($included_item['meta']['omitted'])) {
             $rasterized['meta']['omitted']['detail'] = 'Some resources have been omitted because of insufficient authorization.';
-            foreach ($included_item['meta']['omitted']['links'] as $link_key => $link) {
-              $rasterized['meta']['omitted']['links'][$link_key] = $link;
+            foreach ($included_item['meta']['omitted']['links'] as $old_key => $link) {
+              $key = $old_key === 'help' ? $old_key : 'item:' . static::getLinkHash($link_hash_salt, $link['href']);
+              $rasterized['meta']['omitted']['links'][$key] = $link;
             }
           }
         }
@@ -282,6 +286,21 @@ class JsonApiDocumentTopLevelNormalizerValue implements ValueExtractorInterface,
    */
   protected function isErrorDocument() {
     return $this->documentType === static::ERROR_DOCUMENT;
+  }
+
+  /**
+   * Hashes an omitted link.
+   *
+   * @param string $salt
+   *   A hash salt.
+   * @param string $link_href
+   *   The omitted link.
+   *
+   * @return string
+   *   A 7 character hash.
+   */
+  protected static function getLinkHash($salt, $link_href) {
+    return substr(str_replace(['-', '_'], '', Crypt::hashBase64($salt . $link_href)), 0, 7);
   }
 
 }

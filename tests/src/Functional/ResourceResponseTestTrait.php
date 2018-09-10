@@ -3,6 +3,7 @@
 namespace Drupal\Tests\jsonapi\Functional;
 
 use Drupal\Component\Serialization\Json;
+use Drupal\Component\Utility\Crypt;
 use Drupal\Core\Access\AccessResultInterface;
 use Drupal\Core\Access\AccessResultReasonInterface;
 use Drupal\Core\Cache\Cache;
@@ -43,25 +44,16 @@ trait ResourceResponseTestTrait {
     assert(count($responses) > 0);
     $merged_document = [];
     $merged_cacheability = new CacheableMetadata();
-    $omitted = $errors = [];
     foreach ($responses as $response) {
       $response_document = $response->getResponseData();
       // If any of the response documents had top-level errors, we should later
       // expect the merged document to have all errors as omitted links under
       // the 'meta.omitted' member.
       if (!empty($response_document['errors'])) {
-        $errors = array_merge($errors, $response_document['errors']);
+        static::addOmittedObject($merged_document, static::errorsToOmittedObject($response_document['errors']));
       }
-      if (!empty($response_document['meta']['omitted']['links'])) {
-        if (!empty($omitted)) {
-          $omitted_links = array_diff_key($response_document['meta']['omitted']['links'], array_flip(['help']));
-          foreach ($omitted_links as $key => $link) {
-            $omitted['links'][$key] = $link;
-          }
-        }
-        else {
-          $omitted = $response_document['meta']['omitted'];
-        }
+      if (!empty($response_document['meta']['omitted'])) {
+        static::addOmittedObject($merged_document, $response_document['meta']['omitted']);
       }
       elseif (isset($response_document['data'])) {
         $response_data = $response_document['data'];
@@ -89,22 +81,6 @@ trait ResourceResponseTestTrait {
       ],
       'version' => '1.0',
     ];
-    if (!empty($omitted)) {
-      $merged_document['meta']['omitted'] = $omitted;
-    }
-    if (!empty($errors)) {
-      $merged_document['meta']['omitted']['detail'] = 'Some resources have been omitted because of insufficient authorization.';
-      $merged_document['meta']['omitted']['links']['help'] = 'https://www.drupal.org/docs/8/modules/json-api/filtering#filters-access-control';
-      foreach ($errors as $index => $error) {
-        $merged_document['meta']['omitted']['links']['item:' . \Drupal::service('uuid')->generate()] = [
-          'href' => $error['links']['via'],
-          'meta' => [
-            'rel' => 'item',
-            'detail' => $error['detail'],
-          ],
-        ];
-      }
-    }
     // Until we can reasonably know what caused an error, we shouldn't include
     // 'self' links in error documents. For example, a 404 shouldn't have a
     // 'self' link because HATEOAS links shouldn't point to resources which do
@@ -523,6 +499,114 @@ trait ResourceResponseTestTrait {
       'jsonapi' => static::$jsonApiMember,
       'links' => ['self' => $self_link],
     ]);
+  }
+
+  /**
+   * Add the omitted object to the document or merges it if one already exists.
+   *
+   * @param array $document
+   *   The JSON API response document.
+   * @param array $omitted
+   *   The omitted object.
+   */
+  protected static function addOmittedObject(array &$document, array $omitted) {
+    // @todo: remove this guard when inaccessible relationships are able to raise errors in https://www.drupal.org/project/jsonapi/issues/2956084.
+    // Only add links to the document if links other than 'help' exist.
+    if (empty(array_diff_key($omitted['links'], array_flip(['help'])))) {
+      return;
+    }
+    if (isset($document['meta']['omitted'])) {
+      $document['meta']['omitted'] = static::mergeOmittedObjects($document['meta']['omitted'], $omitted);
+    }
+    else {
+      $document['meta']['omitted'] = $omitted;
+    }
+  }
+
+  /**
+   * Maps error objects into an omitted object.
+   *
+   * @param array $errors
+   *   An array of error objects.
+   *
+   * @return array
+   *   A new omitted object.
+   */
+  protected static function errorsToOmittedObject(array $errors) {
+    $omitted = [
+      'detail' => 'Some resources have been omitted because of insufficient authorization.',
+      'links' => [
+        'help' => 'https://www.drupal.org/docs/8/modules/json-api/filtering#filters-access-control',
+      ],
+    ];
+    foreach ($errors as $error) {
+      $omitted['links']['item:' . substr(Crypt::hashBase64($error['links']['via']), 0, 7)] = [
+        'href' => $error['links']['via'],
+        'meta' => [
+          'detail' => $error['detail'],
+          'rel' => 'item',
+        ],
+      ];
+    }
+    return $omitted;
+  }
+
+  /**
+   * Merges the links of two omitted objects and returns a new omitted object.
+   *
+   * @param array $a
+   *   The first omitted object.
+   * @param array $b
+   *   The second omitted object.
+   *
+   * @return mixed
+   *   A new, merged omitted object.
+   */
+  protected static function mergeOmittedObjects(array $a, array $b) {
+    $merged['detail'] = 'Some resources have been omitted because of insufficient authorization.';
+    $merged['links']['help'] = 'https://www.drupal.org/docs/8/modules/json-api/filtering#filters-access-control';
+    $a_links = array_diff_key($a['links'], array_flip(['help']));
+    $b_links = array_diff_key($b['links'], array_flip(['help']));
+    foreach (array_merge($a_links, $b_links) as $link) {
+      $merged['links'][$link['href'] . $link['meta']['detail']] = $link;
+    }
+    static::resetOmittedLinkKeys($merged);
+    return $merged;
+  }
+
+  /**
+   * Sorts an omitted link object array by href.
+   *
+   * @param array $omitted
+   *   An array of JSON API omitted link objects.
+   */
+  protected static function sortOmittedLinks(array &$omitted) {
+    $help = $omitted['links']['help'];
+    $links = array_diff_key($omitted['links'], array_flip(['help']));
+    uasort($links, function ($a, $b) {
+      return strcmp($a['href'], $b['href']);
+    });
+    $omitted['links'] = ['help' => $help] + $links;
+  }
+
+  /**
+   * Resets omitted link keys.
+   *
+   * Omitted link keys are a link relation type + a random string. This string
+   * is meaningless and only serves to differentiate link objects. Given that
+   * these are random, we can't assert their value.
+   *
+   * @param array $omitted
+   *   An array of JSON API omitted link objects.
+   */
+  protected static function resetOmittedLinkKeys(array &$omitted) {
+    $help = $omitted['links']['help'];
+    $reindexed = [];
+    $links = array_diff_key($omitted['links'], array_flip(['help']));
+    foreach (array_values($links) as $index => $link) {
+      $reindexed['item:' . $index] = $link;
+    }
+    $omitted['links'] = ['help' => $help] + $reindexed;
   }
 
 }
