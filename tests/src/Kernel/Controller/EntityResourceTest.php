@@ -36,7 +36,12 @@ use Symfony\Component\HttpKernel\Exception\HttpException;
  */
 class EntityResourceTest extends JsonapiKernelTestBase {
 
-  const NODE_UUID = [
+  /**
+   * Static UUIDs to use in testing.
+   *
+   * @var array
+   */
+  protected static $nodeUuid = [
     1 => '83bc47ad-2c58-45e3-9136-abcdef111111',
     2 => '83bc47ad-2c58-45e3-9136-abcdef222222',
     3 => '83bc47ad-2c58-45e3-9136-abcdef333333',
@@ -129,7 +134,7 @@ class EntityResourceTest extends JsonapiKernelTestBase {
       'title' => 'dummy_title',
       'type' => 'article',
       'uid' => $this->user->id(),
-      'uuid' => static::NODE_UUID[1],
+      'uuid' => static::$nodeUuid[1],
     ]);
     $this->node->save();
 
@@ -137,7 +142,7 @@ class EntityResourceTest extends JsonapiKernelTestBase {
       'type' => 'article',
       'title' => 'Another test node',
       'uid' => $this->user->id(),
-      'uuid' => static::NODE_UUID[2],
+      'uuid' => static::$nodeUuid[2],
     ]);
     $this->node2->save();
 
@@ -146,7 +151,7 @@ class EntityResourceTest extends JsonapiKernelTestBase {
       'title' => 'Unpublished test node',
       'uid' => $this->user->id(),
       'status' => 0,
-      'uuid' => static::NODE_UUID[3],
+      'uuid' => static::$nodeUuid[3],
     ]);
     $this->node3->save();
 
@@ -159,7 +164,7 @@ class EntityResourceTest extends JsonapiKernelTestBase {
         ['target_id' => $this->node2->id()],
         ['target_id' => $this->node3->id()],
       ],
-      'uuid' => static::NODE_UUID[4],
+      'uuid' => static::$nodeUuid[4],
     ]);
     $this->node4->save();
 
@@ -640,8 +645,8 @@ class EntityResourceTest extends JsonapiKernelTestBase {
       // Replace relationships.
       [
         [
-          new ResourceIdentifier('node--article', static::NODE_UUID[1]),
-          new ResourceIdentifier('node--article', static::NODE_UUID[2]),
+          new ResourceIdentifier('node--article', static::$nodeUuid[1]),
+          new ResourceIdentifier('node--article', static::$nodeUuid[2]),
         ],
       ],
       // Remove relationships.
@@ -687,15 +692,15 @@ class EntityResourceTest extends JsonapiKernelTestBase {
       // Remove one relationship.
       [
         [
-          new ResourceIdentifier('node--article', static::NODE_UUID[1]),
+          new ResourceIdentifier('node--article', static::$nodeUuid[1]),
         ],
         [['target_id' => 2]],
       ],
       // Remove all relationships.
       [
         [
-          new ResourceIdentifier('node--article', static::NODE_UUID[2]),
-          new ResourceIdentifier('node--article', static::NODE_UUID[1]),
+          new ResourceIdentifier('node--article', static::$nodeUuid[2]),
+          new ResourceIdentifier('node--article', static::$nodeUuid[1]),
         ],
         [],
       ],

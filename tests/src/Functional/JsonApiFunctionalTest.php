@@ -171,9 +171,9 @@ class JsonApiFunctionalTest extends JsonApiFunctionalTestBase {
     ]));
     $this->assertSession()->statusCodeEquals(200);
     $this->assertEquals(1, count($single_output['data']));
-    $this->assertEquals(1, count(array_filter($single_output['meta']['omitted']['links'], function ($key) {
+    $this->assertEquals(1, count(array_filter(array_keys($single_output['meta']['omitted']['links']), function ($key) {
       return $key !== 'help';
-    }, ARRAY_FILTER_USE_KEY)));
+    })));
     $link_keys = array_keys($single_output['meta']['omitted']['links']);
     $this->assertSame('help', reset($link_keys));
     $this->assertRegExp('/^item:[a-zA-Z0-9]{7}$/', next($link_keys));

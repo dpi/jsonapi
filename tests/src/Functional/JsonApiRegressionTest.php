@@ -5,6 +5,7 @@ namespace Drupal\Tests\jsonapi\Functional;
 use Drupal\comment\Entity\Comment;
 use Drupal\comment\Plugin\Field\FieldType\CommentItemInterface;
 use Drupal\comment\Tests\CommentTestTrait;
+use Drupal\Component\Serialization\Json;
 use Drupal\Core\Field\FieldStorageDefinitionInterface;
 use Drupal\Core\Url;
 use Drupal\field\Entity\FieldConfig;
@@ -458,8 +459,9 @@ class JsonApiRegressionTest extends JsonApiFunctionalTestBase {
     $response = $this->request('GET', Url::fromUri('internal:/jsonapi/node/dog'), $request_options);
     $this->assertSame(404, $response->getStatusCode());
 
-    ($node_type_dog = NodeType::create(['type' => 'dog']))->save();
-    ($node_type_cat = NodeType::create(['type' => 'cat']))->save();
+    $node_type_dog = NodeType::create(['type' => 'dog']);
+    $node_type_dog->save();
+    NodeType::create(['type' => 'cat'])->save();
     \Drupal::service('router.builder')->rebuildIfNeeded();
 
     $response = $this->request('GET', Url::fromUri('internal:/jsonapi/node/dog'), $request_options);
@@ -468,7 +470,8 @@ class JsonApiRegressionTest extends JsonApiFunctionalTestBase {
     $this->createEntityReferenceField('node', 'dog', 'field_test', NULL, 'node');
     \Drupal::service('router.builder')->rebuildIfNeeded();
 
-    ($dog = Node::create(['type' => 'dog', 'title' => 'Rosie P. Mosie']))->save();
+    $dog = Node::create(['type' => 'dog', 'title' => 'Rosie P. Mosie']);
+    $dog->save();
 
     $response = $this->request('GET', Url::fromUri('internal:/jsonapi/node/dog/' . $dog->uuid() . '/field_test'), $request_options);
     $this->assertSame(200, $response->getStatusCode());
@@ -476,7 +479,8 @@ class JsonApiRegressionTest extends JsonApiFunctionalTestBase {
     $this->createEntityReferenceField('node', 'cat', 'field_test', NULL, 'node');
     \Drupal::service('router.builder')->rebuildIfNeeded();
 
-    ($cat = Node::create(['type' => 'cat', 'title' => 'E. Napoleon']))->save();
+    $cat = Node::create(['type' => 'cat', 'title' => 'E. Napoleon']);
+    $cat->save();
 
     $response = $this->request('GET', Url::fromUri('internal:/jsonapi/node/cat/' . $cat->uuid() . '/field_test'), $request_options);
     $this->assertSame(200, $response->getStatusCode());
