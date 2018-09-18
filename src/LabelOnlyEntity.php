@@ -5,15 +5,19 @@ namespace Drupal\jsonapi;
 use Drupal\Core\Cache\CacheableDependencyInterface;
 use Drupal\Core\Cache\CacheableDependencyTrait;
 use Drupal\Core\Entity\EntityInterface;
+use Drupal\jsonapi\JsonApiResource\ResourceIdentifier;
+use Drupal\jsonapi\JsonApiResource\ResourceIdentifierInterface;
+use Drupal\jsonapi\JsonApiResource\ResourceIdentifierTrait;
 
 /**
  * Value object decorating an Entity object; only its label is to be normalized.
  *
  * @internal
  */
-class LabelOnlyEntity implements CacheableDependencyInterface {
+class LabelOnlyEntity implements CacheableDependencyInterface, ResourceIdentifierInterface {
 
   use CacheableDependencyTrait;
+  use ResourceIdentifierTrait;
 
   /**
    * Constructs a LabelOnlyEntity value object.
@@ -22,6 +26,7 @@ class LabelOnlyEntity implements CacheableDependencyInterface {
    *   The entity for which to only normalize its label.
    */
   public function __construct(EntityInterface $entity) {
+    $this->resourceIdentifier = ResourceIdentifier::fromEntity($entity);
     $this->entity = $entity;
     $this->setCacheability($entity);
   }

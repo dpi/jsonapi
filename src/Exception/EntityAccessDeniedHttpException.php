@@ -8,15 +8,19 @@ use Drupal\Core\Cache\CacheableMetadata;
 use Drupal\Core\DependencyInjection\DependencySerializationTrait;
 use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Http\Exception\CacheableAccessDeniedHttpException;
+use Drupal\jsonapi\JsonApiResource\ResourceIdentifier;
+use Drupal\jsonapi\JsonApiResource\ResourceIdentifierInterface;
+use Drupal\jsonapi\JsonApiResource\ResourceIdentifierTrait;
 
 /**
  * Enhances the access denied exception with information about the entity.
  *
  * @internal
  */
-class EntityAccessDeniedHttpException extends CacheableAccessDeniedHttpException {
+class EntityAccessDeniedHttpException extends CacheableAccessDeniedHttpException implements ResourceIdentifierInterface {
 
   use DependencySerializationTrait;
+  use ResourceIdentifierTrait;
 
   /**
    * The error which caused the 403.
@@ -59,6 +63,8 @@ class EntityAccessDeniedHttpException extends CacheableAccessDeniedHttpException
       $error['reason'] = $entity_access->getReason();
     }
     $this->error = $error;
+    // @todo: remove this ternary operation in https://www.drupal.org/project/jsonapi/issues/2997594.
+    $this->resourceIdentifier = $entity ? ResourceIdentifier::fromEntity($entity) : NULL;
   }
 
   /**

@@ -113,6 +113,9 @@ services:
   jsonapi.field_resolver:
     class: Drupal\jsonapi\Context\FieldResolver
     arguments: ['@entity_type.manager', '@entity_field.manager', '@entity_type.bundle.info', '@jsonapi.resource_type.repository']
+  jsonapi.include_resolver:
+    class: Drupal\jsonapi\IncludeResolver
+    arguments: ['@entity_type.manager']
   access_check.jsonapi.relationship_field_access:
     class: Drupal\jsonapi\Access\RelationshipFieldAccess
     tags:
@@ -154,6 +157,7 @@ services:
       - '@jsonapi.resource_type.repository'
       - '@renderer'
       - '@entity.repository'
+      - '@jsonapi.include_resolver'
 
   # Event subscribers.
   jsonapi.custom_query_parameter_names_validator.subscriber:

@@ -181,14 +181,26 @@ class JsonApiDocumentTopLevelNormalizer extends NormalizerBase implements Denorm
       return new JsonApiDocumentTopLevelNormalizerValue(JsonApiDocumentTopLevelNormalizerValue::ERROR_DOCUMENT, $normalizer_values, [], FALSE, $object->getMeta());
     }
 
+    $includes = $omissions = [];
+    foreach ($object->getIncludes() as $include) {
+      $include instanceof EntityAccessDeniedHttpException
+        ? $omissions[] = $serializer->normalize($include, $format, $context)
+        : $includes[] = $serializer->normalize($include, $format, $context);
+    }
+
     if ($data instanceof EntityReferenceFieldItemListInterface) {
       $normalizer_values = [
         $this->serializer->normalize($data, $format, $context),
       ];
+
+      if (!empty($omissions)) {
+        $normalizer_values = array_merge($normalizer_values, $omissions);
+      }
+
       // RelationshipNormalizerValues already handle single vs multiple
       // multiple cardinality fields.
       $cardinality = 1;
-      return new JsonApiDocumentTopLevelNormalizerValue(JsonApiDocumentTopLevelNormalizerValue::RESOURCE_OBJECT_DOCUMENT, $normalizer_values, [], $cardinality, $object->getMeta());
+      return new JsonApiDocumentTopLevelNormalizerValue(JsonApiDocumentTopLevelNormalizerValue::RESOURCE_OBJECT_DOCUMENT, $normalizer_values, [], $cardinality, $includes, $object->getMeta());
     }
     $is_collection = $data instanceof EntityCollection;
     // To improve the logical workflow deal with an array at all times.
@@ -197,8 +209,12 @@ class JsonApiDocumentTopLevelNormalizer extends NormalizerBase implements Denorm
       return $serializer->normalize($entity, $format, $context);
     }, $entities);
 
+    if (!empty($omissions)) {
+      $normalizer_values = array_merge($normalizer_values, $omissions);
+    }
+
     $cardinality = $is_collection ? $data->getCardinality() : 1;
-    return new JsonApiDocumentTopLevelNormalizerValue(JsonApiDocumentTopLevelNormalizerValue::RESOURCE_OBJECT_DOCUMENT, $normalizer_values, $object->getLinks(), $cardinality, $object->getMeta());
+    return new JsonApiDocumentTopLevelNormalizerValue(JsonApiDocumentTopLevelNormalizerValue::RESOURCE_OBJECT_DOCUMENT, $normalizer_values, $object->getLinks(), $cardinality, $includes, $object->getMeta());
   }
 
   /**

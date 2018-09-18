@@ -24,6 +24,7 @@ use Drupal\Core\TypedData\TypedDataInternalPropertiesHelper;
 use Drupal\Core\Url;
 use Drupal\field\Entity\FieldConfig;
 use Drupal\field\Entity\FieldStorageConfig;
+use Drupal\jsonapi\JsonApiResource\NullEntityCollection;
 use Drupal\jsonapi\Normalizer\HttpExceptionNormalizer;
 use Drupal\jsonapi\JsonApiResource\JsonApiDocumentTopLevel;
 use Drupal\jsonapi\ResourceResponse;
@@ -35,7 +36,6 @@ use Drupal\user\RoleInterface;
 use Drupal\user\UserInterface;
 use GuzzleHttp\RequestOptions;
 use Psr\Http\Message\ResponseInterface;
-use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
@@ -343,7 +343,7 @@ abstract class ResourceTestBase extends BrowserTestBase {
    *   The JSON API normalization for the given entity.
    */
   protected function normalize(EntityInterface $entity, Url $url) {
-    $doc = new JsonApiDocumentTopLevel($entity, [
+    $doc = new JsonApiDocumentTopLevel($entity, new NullEntityCollection(), [
       'self' => $url->toString(TRUE)->getGeneratedUrl(),
     ]);
     return $this->serializer->normalize($doc, 'api_json', [
@@ -2646,6 +2646,13 @@ abstract class ResourceTestBase extends BrowserTestBase {
           }
         }
       }
+    }
+    if (!empty($expected_document['meta']['errors'])) {
+      $deduplicated = [];
+      foreach ($expected_document['meta']['errors'] as $error) {
+        $deduplicated[$error['id']] = $error;
+      }
+      $expected_document['meta']['errors'] = array_values($deduplicated);
     }
     return (new ResourceResponse($expected_document))->addCacheableDependency($expected_cacheability);
   }

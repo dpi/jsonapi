@@ -154,7 +154,7 @@ class FieldResolver {
    */
   public static function resolveInternalIncludePath(ResourceType $resource_type, array $path_parts, $depth = 0) {
     $cacheability = (new CacheableMetadata())->addCacheContexts(['url.query_args:include']);
-    if (empty($path_parts)) {
+    if (empty($path_parts[0])) {
       throw new CacheableBadRequestHttpException($cacheability, 'Empty include path.');
     }
     $public_field_name = $path_parts[0];

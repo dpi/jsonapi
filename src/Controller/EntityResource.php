@@ -18,6 +18,8 @@ use Drupal\Core\Render\RenderContext;
 use Drupal\Core\Render\RendererInterface;
 use Drupal\jsonapi\Exception\EntityAccessDeniedHttpException;
 use Drupal\jsonapi\Exception\UnprocessableHttpEntityException;
+use Drupal\jsonapi\IncludeResolver;
+use Drupal\jsonapi\JsonApiResource\NullEntityCollection;
 use Drupal\jsonapi\JsonApiResource\ResourceIdentifier;
 use Drupal\jsonapi\LabelOnlyEntity;
 use Drupal\jsonapi\Query\Filter;
@@ -29,6 +31,7 @@ use Drupal\jsonapi\JsonApiResource\JsonApiDocumentTopLevel;
 use Drupal\jsonapi\ResourceResponse;
 use Drupal\jsonapi\ResourceType\ResourceType;
 use Drupal\jsonapi\ResourceType\ResourceTypeRepositoryInterface;
+use Drupal\jsonapi\Routing\Routes;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
 use Drupal\Core\Http\Exception\CacheableBadRequestHttpException;
@@ -85,6 +88,13 @@ class EntityResource {
   protected $entityRepository;
 
   /**
+   * The include resolver.
+   *
+   * @var \Drupal\jsonapi\IncludeResolver
+   */
+  protected $includeResolver;
+
+  /**
    * Instantiates a EntityResource object.
    *
    * @param \Drupal\Core\Entity\EntityTypeManagerInterface $entity_type_manager
@@ -99,14 +109,17 @@ class EntityResource {
    *   The renderer.
    * @param \Drupal\Core\Entity\EntityRepositoryInterface $entity_repository
    *   The entity repository.
+   * @param \Drupal\jsonapi\IncludeResolver $include_resolver
+   *   The include resolver.
    */
-  public function __construct(EntityTypeManagerInterface $entity_type_manager, EntityFieldManagerInterface $field_manager, LinkManager $link_manager, ResourceTypeRepositoryInterface $resource_type_repository, RendererInterface $renderer, EntityRepositoryInterface $entity_repository) {
+  public function __construct(EntityTypeManagerInterface $entity_type_manager, EntityFieldManagerInterface $field_manager, LinkManager $link_manager, ResourceTypeRepositoryInterface $resource_type_repository, RendererInterface $renderer, EntityRepositoryInterface $entity_repository, IncludeResolver $include_resolver) {
     $this->entityTypeManager = $entity_type_manager;
     $this->fieldManager = $field_manager;
     $this->linkManager = $link_manager;
     $this->resourceTypeRepository = $resource_type_repository;
     $this->renderer = $renderer;
     $this->entityRepository = $entity_repository;
+    $this->includeResolver = $include_resolver;
   }
 
   /**
@@ -130,7 +143,7 @@ class EntityResource {
     if ($entity instanceof EntityAccessDeniedHttpException) {
       throw $entity;
     }
-    $response = $this->buildWrappedResponse($entity, $request);
+    $response = $this->buildWrappedResponse($entity, $request, $this->getIncludes($request, $entity));
     return $response;
   }
 
@@ -235,7 +248,7 @@ class EntityResource {
     $entity->save();
 
     // Build response object.
-    $response = $this->buildWrappedResponse($entity, $request, 201);
+    $response = $this->buildWrappedResponse($entity, $request, new NullEntityCollection(), 201);
 
     // According to JSON API specification, when a new entity was created
     // we should send "Location" header to the frontend.
@@ -291,7 +304,7 @@ class EntityResource {
 
     $this->validate($entity, $field_names);
     $entity->save();
-    return $this->buildWrappedResponse($entity, $request);
+    return $this->buildWrappedResponse($entity, $request, new NullEntityCollection());
   }
 
   /**
@@ -387,7 +400,7 @@ class EntityResource {
       $entity_collection->setTotalCount($total_results);
     }
 
-    $response = $this->respondWithCollection($entity_collection, $resource_type, $request);
+    $response = $this->respondWithCollection($entity_collection, $this->getIncludes($request, $entity_collection), $request, $resource_type);
 
     $response->addCacheableDependency($query_cacheability);
 
@@ -431,7 +444,7 @@ class EntityResource {
       $collection_data[] = static::getAccessCheckedEntity($referenced_entity);
     }
     $entity_collection = new EntityCollection($collection_data, $field_list->getFieldDefinition()->getFieldStorageDefinition()->getCardinality());
-    $response = $this->buildWrappedResponse($entity_collection, $request);
+    $response = $this->buildWrappedResponse($entity_collection, $request, $this->getIncludes($request, $entity_collection, $related_field));
 
     // $response does not contain the entity list cache tag. We add the
     // cacheable metadata for the finite list of entities in the relationship.
@@ -458,9 +471,9 @@ class EntityResource {
    *   The response.
    */
   public function getRelationship(ResourceType $resource_type, FieldableEntityInterface $entity, $related_field, Request $request, $response_code = 200) {
-    /* @var \Drupal\Core\Field\FieldItemListInterface $field_list */
+    /* @var \Drupal\Core\Field\EntityReferenceFieldItemListInterface $field_list */
     $field_list = $entity->get($resource_type->getInternalName($related_field));
-    $response = $this->buildWrappedResponse($field_list, $request, $response_code);
+    $response = $this->buildWrappedResponse($field_list, $request, $this->getIncludes($request, $entity), $response_code);
     // Add the host entity as a cacheable dependency.
     $response->addCacheableDependency($entity);
     return $response;
@@ -804,6 +817,9 @@ class EntityResource {
    *   The data to wrap.
    * @param \Symfony\Component\HttpFoundation\Request $request
    *   The request object.
+   * @param \Drupal\jsonapi\JsonApiResource\EntityCollection $includes
+   *   The resources to be included in the document. Use NullEntityCollection if
+   *   there should be no included resources in the document.
    * @param int $response_code
    *   The response code.
    * @param array $headers
@@ -816,25 +832,27 @@ class EntityResource {
    * @return \Drupal\jsonapi\ResourceResponse
    *   The response.
    */
-  protected function buildWrappedResponse($data, Request $request, $response_code = 200, array $headers = [], array $links = [], array $meta = []) {
+  protected function buildWrappedResponse($data, Request $request, EntityCollection $includes, $response_code = 200, array $headers = [], array $links = [], array $meta = []) {
     $links['self'] = $this->linkManager->getRequestLink($request);
-    return new ResourceResponse(new JsonApiDocumentTopLevel($data, $links, $meta), $response_code, $headers);
+    return new ResourceResponse(new JsonApiDocumentTopLevel($data, $includes, $links, $meta), $response_code, $headers);
   }
 
   /**
    * Respond with an entity collection.
    *
    * @param \Drupal\jsonapi\JsonApiResource\EntityCollection $entity_collection
-   *   The collection of entites.
-   * @param \Drupal\jsonapi\ResourceType\ResourceType $resource_type
-   *   The base JSON API resource type for the request to be served.
+   *   The collection of entities.
+   * @param \Drupal\jsonapi\JsonApiResource\EntityCollection $includes
+   *   The resources to be included in the document.
    * @param \Symfony\Component\HttpFoundation\Request $request
    *   The request object.
+   * @param \Drupal\jsonapi\ResourceType\ResourceType $resource_type
+   *   The base JSON API resource type for the request to be served.
    *
    * @return \Drupal\jsonapi\ResourceResponse
    *   The response.
    */
-  protected function respondWithCollection(EntityCollection $entity_collection, ResourceType $resource_type, Request $request) {
+  protected function respondWithCollection(EntityCollection $entity_collection, EntityCollection $includes, Request $request, ResourceType $resource_type) {
     $link_context = [
       'has_next_page' => $entity_collection->hasNextPage(),
     ];
@@ -843,7 +861,7 @@ class EntityResource {
       $link_context['total_count'] = $meta['count'] = $entity_collection->getTotalCount();
     }
     $collection_links = $this->linkManager->getPagerLinks(\Drupal::request(), $link_context);
-    $response = $this->buildWrappedResponse($entity_collection, $request, 200, [], $collection_links, $meta);
+    $response = $this->buildWrappedResponse($entity_collection, $request, $includes, 200, [], $collection_links, $meta);
 
     // When a new change to any entity in the resource happens, we cannot ensure
     // the validity of this cached list. Add the list tag to deal with that.
@@ -891,6 +909,30 @@ class EntityResource {
     else {
       throw new BadRequestHttpException('The serialized entity and the destination entity are of different types.');
     }
+  }
+
+  /**
+   * Gets includes for the given response data.
+   *
+   * @param \Symfony\Component\HttpFoundation\Request $request
+   *   The request object.
+   * @param \Drupal\Core\Entity\EntityInterface|\Drupal\jsonapi\JsonApiResource\EntityCollection $data
+   *   The response data from which to resolve includes.
+   * @param string $related_field
+   *   (optional) The relationship field name to be given for getting includes
+   *   on a related route.
+   *
+   * @return \Drupal\jsonapi\JsonApiResource\EntityCollection
+   *   An EntityCollection to be included or a NullEntityCollection if the
+   *   request does not specify any include paths.
+   *
+   * @throws \Drupal\Component\Plugin\Exception\InvalidPluginDefinitionException
+   * @throws \Drupal\Component\Plugin\Exception\PluginNotFoundException
+   */
+  public function getIncludes(Request $request, $data, $related_field = NULL) {
+    return $request->query->has('include') && ($include_parameter = $request->query->get('include')) && !empty($include_parameter)
+      ? $this->includeResolver->resolve($request->get(Routes::RESOURCE_TYPE_KEY), $data, $include_parameter, $related_field)
+      : new NullEntityCollection();
   }
 
   /**

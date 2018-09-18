@@ -85,16 +85,19 @@ class JsonApiDocumentTopLevelNormalizerValue implements ValueExtractorInterface,
    *   The cardinality of the document's primary data. -1 for unlimited
    *   cardinality. For example, an individual resource would have a cardinality
    *   of 1. A related resource would have a cardinality of -1 for a to-many
-   *   relationship, but a cardinality of 1 for a to-one relationship. Required
-   *   for resource object documents.
+   *   relationship, but a cardinality of 1 for a to-one relationship.
+   * @param \Drupal\jsonapi\JsonApiResource\EntityCollection|false $includes
+   *   An entity collection of resource to be included or FALSE if the document
+   *   does not have included resources.
    * @param array $meta
    *   (optional) The metadata to normalize.
    */
-  public function __construct($document_type, array $values, array $links, $cardinality = FALSE, array $meta = []) {
+  public function __construct($document_type, array $values, array $links, $cardinality = FALSE, $includes = FALSE, array $meta = []) {
     assert(in_array($document_type, [static::RESOURCE_OBJECT_DOCUMENT, static::ERROR_DOCUMENT]));
     assert(is_int($cardinality) || $document_type === static::ERROR_DOCUMENT);
     $this->documentType = $document_type;
     $this->values = $values;
+
     array_walk($values, [$this, 'addCacheableDependency']);
 
     if (!$this->isErrorDocument()) {
@@ -116,16 +119,11 @@ class JsonApiDocumentTopLevelNormalizerValue implements ValueExtractorInterface,
       $this->meta = $meta;
 
       // Get an array of arrays of includes.
-      $this->includes = array_map(function ($value) {
-        return $value->getIncludes();
-      }, $values);
+      $this->includes = $includes;
       // Flatten the includes.
-      $this->includes = array_reduce($this->includes, function ($carry, $includes) {
-        array_walk($includes, [$this, 'addCacheableDependency']);
-        return array_merge($carry, $includes);
-      }, []);
-      // Filter the empty values.
-      $this->includes = array_filter($this->includes);
+      if ($this->includes) {
+        array_walk($this->includes, [$this, 'addCacheableDependency']);
+      }
     }
     $this->documentType = $document_type;
   }
@@ -208,29 +206,10 @@ class JsonApiDocumentTopLevelNormalizerValue implements ValueExtractorInterface,
       $rasterized['data'] = empty($rasterized['data']) ? NULL : reset($rasterized['data']);
     }
 
-    // This is the top-level JSON API document, therefore the rasterized value
-    // must include the rasterized includes: there is no further level to bubble
-    // them to!
-    $included = array_filter($this->rasterizeIncludes());
-    if (!empty($included)) {
-      foreach ($included as $included_item) {
-        if ($included_item['data'] === FALSE) {
-          unset($included_item['data']);
-          $rasterized = NestedArray::mergeDeep($rasterized, $included_item);
-        }
-        else {
-          if ($included_item['data']) {
-            $rasterized['included'][] = $included_item['data'];
-          }
-          if (!empty($included_item['meta']['omitted'])) {
-            $rasterized['meta']['omitted']['detail'] = 'Some resources have been omitted because of insufficient authorization.';
-            foreach ($included_item['meta']['omitted']['links'] as $old_key => $link) {
-              $key = $old_key === 'help' ? $old_key : 'item:' . static::getLinkHash($link_hash_salt, $link['href']);
-              $rasterized['meta']['omitted']['links'][$key] = $link;
-            }
-          }
-        }
-      }
+    if ($this->includes) {
+      $rasterized['included'] = array_map(function ($include) {
+        return $include->rasterizeValue();
+      }, $this->includes);
     }
 
     if (empty($rasterized['links'])) {
@@ -238,44 +217,6 @@ class JsonApiDocumentTopLevelNormalizerValue implements ValueExtractorInterface,
     }
 
     return $rasterized;
-  }
-
-  /**
-   * Gets a flattened list of includes in all the chain.
-   *
-   * @return \Drupal\jsonapi\Normalizer\Value\EntityNormalizerValue[]
-   *   The array of included relationships.
-   */
-  public function getIncludes() {
-    $nested_includes = array_map(function ($include) {
-      return $include->getIncludes();
-    }, $this->includes);
-    $includes = array_reduce(array_filter($nested_includes), function ($carry, $item) {
-      return array_merge($carry, $item);
-    }, $this->includes);
-    // Make sure we don't output duplicate includes.
-    return array_values(array_reduce($includes, function ($unique_includes, $include) {
-      $rasterized_include = $include->rasterizeValue();
-
-      if (empty($rasterized_include['data'])) {
-        $unique_includes[] = $include;
-      }
-      else {
-        $unique_key = $rasterized_include['data']['type'] . ':' . $rasterized_include['data']['id'];
-        $unique_includes[$unique_key] = $include;
-      }
-      return $unique_includes;
-    }, []));
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function rasterizeIncludes() {
-    // First gather all the includes in the chain.
-    return array_map(function ($include) {
-      return $include->rasterizeValue();
-    }, $this->getIncludes());
   }
 
   /**

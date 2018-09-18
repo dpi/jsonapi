@@ -39,13 +39,6 @@ class NullFieldNormalizerValue implements FieldNormalizerValueInterface {
   /**
    * {@inheritdoc}
    */
-  public function getIncludes() {
-    return [];
-  }
-
-  /**
-   * {@inheritdoc}
-   */
   public function getPropertyType() {
     return $this->propertyType;
   }
@@ -54,20 +47,6 @@ class NullFieldNormalizerValue implements FieldNormalizerValueInterface {
    * {@inheritdoc}
    */
   public function rasterizeValue() {
-    return NULL;
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function rasterizeIncludes() {
-    return [];
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function getAllIncludes() {
     return NULL;
   }
 

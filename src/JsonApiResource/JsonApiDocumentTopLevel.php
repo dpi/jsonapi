@@ -11,7 +11,7 @@ use Drupal\Component\Assertion\Inspector;
  *
  * @internal
  *
- * @todo Add support for the missing optional members: 'jsonapi' and 'included' or document why not.
+ * @todo Add support for the missing optional 'jsonapi' member or document why not.
  */
 class JsonApiDocumentTopLevel {
 
@@ -37,21 +37,33 @@ class JsonApiDocumentTopLevel {
   protected $links;
 
   /**
+   * The includes to normalize.
+   *
+   * @var \Drupal\jsonapi\JsonApiResource\EntityCollection
+   */
+  protected $includes;
+
+  /**
    * Instantiates a JsonApiDocumentTopLevel object.
    *
    * @param \Drupal\Core\Entity\EntityInterface|\Drupal\jsonapi\JsonApiResource\EntityCollection|\Drupal\jsonapi\LabelOnlyEntity|\Drupal\jsonapi\JsonApiResource\ErrorCollection $data
    *   The data to normalize. It can be either a straight up entity or a
    *   collection of entities.
+   * @param \Drupal\jsonapi\JsonApiResource\EntityCollection $includes
+   *   An EntityCollection object containing resources to be included in the
+   *   response document or NULL if there should not be includes.
    * @param string[] $links
    *   The URLs to which the top-level document should link. Keys are strings.
    *   Values are URLs.
    * @param array $meta
    *   (optional) The metadata to normalize.
    */
-  public function __construct($data, array $links, array $meta = []) {
+  public function __construct($data, EntityCollection $includes, array $links, array $meta = []) {
+    assert(!$data instanceof ErrorCollection || $includes instanceof NullEntityCollection);
     assert(Inspector::assertAllStrings($links));
 
     $this->data = $data;
+    $this->includes = $includes;
     $this->links = $links;
     $this->meta = $meta;
   }
@@ -84,6 +96,16 @@ class JsonApiDocumentTopLevel {
    */
   public function getMeta() {
     return $this->meta;
+  }
+
+  /**
+   * Gets an EntityCollection of resources to be included in the response.
+   *
+   * @return \Drupal\jsonapi\JsonApiResource\EntityCollection
+   *   The includes.
+   */
+  public function getIncludes() {
+    return $this->includes;
   }
 
 }

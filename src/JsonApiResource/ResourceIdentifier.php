@@ -12,7 +12,7 @@ use Drupal\Core\TypedData\DataReferenceDefinitionInterface;
  *
  * @internal
  */
-class ResourceIdentifier {
+class ResourceIdentifier implements ResourceIdentifierInterface {
 
   const ARITY_KEY = 'arity';
 
@@ -253,6 +253,22 @@ class ResourceIdentifier {
       $relationships[] = $relationship;
     }
     return $relationships;
+  }
+
+  /**
+   * Creates a ResourceIdentifier object.
+   *
+   * @param \Drupal\Core\Entity\EntityInterface $entity
+   *   The entity from which to create the resource identifier.
+   *
+   * @return self
+   *   A new ResourceIdentifier object.
+   */
+  public static function fromEntity(EntityInterface $entity) {
+    /* @var \Drupal\jsonapi\ResourceType\ResourceTypeRepositoryInterface $resource_type_repository */
+    $resource_type_repository = \Drupal::service('jsonapi.resource_type.repository');
+    $resource_type = $resource_type_repository->get($entity->getEntityTypeId(), $entity->bundle());
+    return new static($resource_type->getTypeName(), $entity->uuid());
   }
 
   /**

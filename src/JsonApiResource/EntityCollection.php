@@ -63,7 +63,7 @@ class EntityCollection implements \IteratorAggregate, \Countable {
     }, $resources));
     assert($cardinality >= -1 && $cardinality !== 0, 'Cardinality must be -1 for unlimited cardinality or a positive integer.');
     assert($cardinality === -1 || count($resources) <= $cardinality, 'If cardinality is not unlimited, the number of given resources must not exceed the cardinality of the collection.');
-    $this->entities = $resources;
+    $this->entities = array_values($resources);
     $this->cardinality = $cardinality;
   }
 
@@ -142,6 +142,44 @@ class EntityCollection implements \IteratorAggregate, \Countable {
    */
   public function getCardinality() {
     return $this->cardinality;
+  }
+
+  /**
+   * Returns a new EntityCollection containing the entities of $this and $other.
+   *
+   * @param \Drupal\jsonapi\JsonApiResource\EntityCollection $a
+   *   An EntityCollection object to be merged.
+   * @param \Drupal\jsonapi\JsonApiResource\EntityCollection $b
+   *   An EntityCollection object to be merged.
+   *
+   * @return \Drupal\jsonapi\JsonApiResource\EntityCollection
+   *   A new merged EntityCollection object.
+   */
+  public static function merge(EntityCollection $a, EntityCollection $b) {
+    return new static(array_merge($a->toArray(), $b->toArray()));
+  }
+
+  /**
+   * Returns a new, deduplicated EntityCollection.
+   *
+   * @param \Drupal\jsonapi\JsonApiResource\EntityCollection $collection
+   *   The EntityCollection to deduplicate.
+   *
+   * @return \Drupal\jsonapi\JsonApiResource\EntityCollection
+   *   A new merged EntityCollection object.
+   */
+  public static function deduplicate(EntityCollection $collection) {
+    $deduplicated = [];
+    foreach ($collection as $resource) {
+      if ($resource instanceof EntityInterface) {
+        $resource_identifier = ResourceIdentifier::fromEntity($resource);
+        $deduplicated[$resource_identifier->getTypeName() . ':' . $resource_identifier->getId()] = $resource;
+      }
+      else {
+        $deduplicated[$resource->getTypeName() . ':' . $resource->getId()] = $resource;
+      }
+    }
+    return new static(array_values($deduplicated));
   }
 
 }

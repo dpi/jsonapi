@@ -24,13 +24,6 @@ class EntityNormalizerValue implements ValueExtractorInterface, CacheableDepende
   protected $values;
 
   /**
-   * The includes.
-   *
-   * @var array
-   */
-  protected $includes;
-
-  /**
    * The resource path.
    *
    * @var array
@@ -67,24 +60,12 @@ class EntityNormalizerValue implements ValueExtractorInterface, CacheableDepende
   public function __construct(array $values, array $context, EntityInterface $entity, array $link_context) {
     $this->setCacheability(static::mergeCacheableDependencies(array_merge([$entity], $values)));
 
-    // Gather includes from all normalizer values, before filtering away null
-    // and include-only normalizer values.
-    $this->includes = array_map(function ($value) {
-      return $value->getIncludes();
-    }, $values);
-
     $this->values = array_filter($values, function ($value) {
       return !($value instanceof NullFieldNormalizerValue || $value instanceof IncludeOnlyRelationshipNormalizerValue);
     });
     $this->context = $context;
     $this->entity = $entity;
     $this->linkManager = $link_context['link_manager'];
-    // Flatten the includes.
-    $this->includes = array_reduce($this->includes, function ($carry, $includes) {
-      return array_merge($carry, $includes);
-    }, []);
-    // Filter the empty values.
-    $this->includes = array_filter($this->includes);
   }
 
   /**
@@ -114,16 +95,6 @@ class EntityNormalizerValue implements ValueExtractorInterface, CacheableDepende
   }
 
   /**
-   * {@inheritdoc}
-   */
-  public function rasterizeIncludes() {
-    // First gather all the includes in the chain.
-    return array_map(function ($include) {
-      return $include->rasterizeValue();
-    }, $this->getIncludes());
-  }
-
-  /**
    * Gets the values.
    *
    * @return mixed
@@ -131,21 +102,6 @@ class EntityNormalizerValue implements ValueExtractorInterface, CacheableDepende
    */
   public function getValues() {
     return $this->values;
-  }
-
-  /**
-   * Gets a flattened list of includes in all the chain.
-   *
-   * @return \Drupal\jsonapi\Normalizer\Value\EntityNormalizerValue[]
-   *   The array of included relationships.
-   */
-  public function getIncludes() {
-    $nested_includes = array_map(function ($include) {
-      return $include->getIncludes();
-    }, $this->includes);
-    return array_reduce(array_filter($nested_includes), function ($carry, $item) {
-      return array_merge($carry, $item);
-    }, $this->includes);
   }
 
 }

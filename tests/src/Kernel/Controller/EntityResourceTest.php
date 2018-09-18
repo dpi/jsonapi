@@ -186,7 +186,8 @@ class EntityResourceTest extends JsonapiKernelTestBase {
       $this->container->get('jsonapi.link_manager'),
       $this->container->get('jsonapi.resource_type.repository'),
       $this->container->get('renderer'),
-      $this->container->get('entity.repository')
+      $this->container->get('entity.repository'),
+      $this->container->get('jsonapi.include_resolver')
     );
   }
 
@@ -260,7 +261,8 @@ class EntityResourceTest extends JsonapiKernelTestBase {
       $this->container->get('jsonapi.link_manager'),
       $this->container->get('jsonapi.resource_type.repository'),
       $this->container->get('renderer'),
-      $this->container->get('entity.repository')
+      $this->container->get('entity.repository'),
+      $this->container->get('jsonapi.include_resolver')
     );
 
     // Get the response.
@@ -300,7 +302,8 @@ class EntityResourceTest extends JsonapiKernelTestBase {
       $this->container->get('jsonapi.link_manager'),
       $this->container->get('jsonapi.resource_type.repository'),
       $this->container->get('renderer'),
-      $this->container->get('entity.repository')
+      $this->container->get('entity.repository'),
+      $this->container->get('jsonapi.include_resolver')
     );
 
     // Get the response.
@@ -342,7 +345,8 @@ class EntityResourceTest extends JsonapiKernelTestBase {
       $this->container->get('jsonapi.link_manager'),
       $this->container->get('jsonapi.resource_type.repository'),
       $this->container->get('renderer'),
-      $this->container->get('entity.repository')
+      $this->container->get('entity.repository'),
+      $this->container->get('jsonapi.include_resolver')
     );
 
     // Get the response.
