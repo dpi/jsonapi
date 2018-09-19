@@ -2,13 +2,16 @@
 
 namespace Drupal\jsonapi\Controller;
 
-use Drupal\Core\Cache\CacheableJsonResponse;
 use Drupal\Core\Cache\CacheableMetadata;
 use Drupal\Core\Controller\ControllerBase;
 use Drupal\Core\Render\RenderContext;
 use Drupal\Core\Render\RendererInterface;
 use Drupal\Core\Session\AccountInterface;
 use Drupal\Core\Url;
+use Drupal\jsonapi\JsonApiResource\EntityCollection;
+use Drupal\jsonapi\JsonApiResource\JsonApiDocumentTopLevel;
+use Drupal\jsonapi\JsonApiResource\NullEntityCollection;
+use Drupal\jsonapi\ResourceResponse;
 use Drupal\jsonapi\ResourceType\ResourceType;
 use Drupal\jsonapi\ResourceType\ResourceTypeRepositoryInterface;
 use Drupal\user\Entity\User;
@@ -76,6 +79,10 @@ class EntryPoint extends ControllerBase {
    *   The response object.
    */
   public function index() {
+    $cacheability = (new CacheableMetadata())
+      ->addCacheContexts(['user.roles:authenticated'])
+      ->addCacheTags(['jsonapi_resource_types']);
+
     // Execute the request in context so the cacheable metadata from the entity
     // grants system is caught and added to the response. This is surfaced when
     // executing the underlying entity query.
@@ -99,32 +106,23 @@ class EntryPoint extends ControllerBase {
       }, ['self' => $self->toString()]);
     };
     $urls = $this->renderer->executeInRenderContext($context, $do_build_urls);
+    if (!$context->isEmpty()) {
+      $cacheability = $cacheability->merge($context->pop());
+    }
 
-    $json_response = new CacheableJsonResponse();
-    $doc = [
-      'data' => [],
-      'links' => $urls,
-    ];
-    $json_response->addCacheableDependency((new CacheableMetadata())
-      ->addCacheContexts(['user.roles:authenticated'])
-      ->addCacheTags(['jsonapi_resource_types'])
-    );
+    $meta = [];
     if ($this->user->isAuthenticated()) {
       $me_url = Url::fromRoute('jsonapi.user--user.individual', ['entity' => User::load($this->user->id())->uuid()])
         ->setAbsolute()
         ->toString(TRUE);
-      $doc['meta']['links']['me'] = $me_url->getGeneratedUrl();
+      $meta['links']['me'] = $me_url->getGeneratedUrl();
       // The cacheability of the `me` URL is the cacheability of that URL itself
       // and the currently authenticated user.
-      $json_response->addCacheableDependency(CacheableMetadata::createFromObject($me_url)->addCacheContexts(['user']));
-    }
-    $json_response->setData($doc);
-
-    if (!$context->isEmpty()) {
-      $json_response->addCacheableDependency($context->pop());
+      $cacheability = $cacheability->merge($me_url)->addCacheContexts(['user']);
     }
 
-    return $json_response;
+    $response = new ResourceResponse(new JsonApiDocumentTopLevel(new EntityCollection([]), new NullEntityCollection(), $urls, $meta));
+    return $response->addCacheableDependency($cacheability);
   }
 
 }

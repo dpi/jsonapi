@@ -42,12 +42,11 @@ class EntryPointTest extends JsonapiKernelTestBase {
       ],
       $processed_response->getCacheableMetadata()->getCacheContexts()
     );
-    $data = json_decode($processed_response->getContent(), TRUE);
-    $links = $data['links'];
+    $links = $processed_response->getResponseData()->getLinks();
     $this->assertRegExp('/.*\/jsonapi/', $links['self']);
     $this->assertRegExp('/.*\/jsonapi\/user\/user/', $links['user--user']);
     $this->assertRegExp('/.*\/jsonapi\/node_type\/node_type/', $links['node_type--node_type']);
-    $this->assertFalse(array_key_exists('meta', $data));
+    $this->assertSame([], $processed_response->getResponseData()->getMeta());
   }
 
 }

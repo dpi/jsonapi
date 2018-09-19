@@ -138,7 +138,7 @@ class ResourceResponseSubscriber implements EventSubscriberInterface {
    */
   protected static function generateContext(Request $request) {
     $resource_type = $request->get('resource_type');
-    assert($resource_type instanceof ResourceType);
+    assert($resource_type instanceof ResourceType || $resource_type === NULL);
 
     // Translate ALL the includes from the public field names to the internal.
     $includes = array_filter(explode(',', $request->query->get('include')));
