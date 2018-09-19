@@ -833,7 +833,7 @@ class EntityResource {
    *   The response.
    */
   protected function buildWrappedResponse($data, Request $request, EntityCollection $includes, $response_code = 200, array $headers = [], array $links = [], array $meta = []) {
-    $links['self'] = $this->linkManager->getRequestLink($request);
+    $links['self']['href'] = $this->linkManager->getRequestLink($request);
     return new ResourceResponse(new JsonApiDocumentTopLevel($data, $includes, $links, $meta), $response_code, $headers);
   }
 

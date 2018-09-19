@@ -44,7 +44,7 @@ class EntityAccessDeniedHttpExceptionNormalizer extends HttpExceptionNormalizer 
           sprintf('jsonapi.%s.individual', \Drupal::service('jsonapi.resource_type.repository')->get($entity_type_id, $bundle)->getTypeName()),
           ['entity' => $entity->uuid()]
         )->setAbsolute()->toString(TRUE);
-        $errors[0]['links']['via'] = $url->getGeneratedUrl();
+        $errors[0]['links']['via']['href'] = $url->getGeneratedUrl();
       }
       $errors[0]['source']['pointer'] = $pointer;
 

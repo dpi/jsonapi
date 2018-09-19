@@ -137,8 +137,8 @@ class TermTest extends ResourceTestBase {
             ],
           ],
           'links' => [
-            'related' => $self_url . '/parent',
-            'self' => $self_url . '/relationships/parent',
+            'related' => ['href' => $self_url . '/parent'],
+            'self' => ['href' => $self_url . '/relationships/parent'],
           ],
         ];
         break;
@@ -152,8 +152,8 @@ class TermTest extends ResourceTestBase {
             ],
           ],
           'links' => [
-            'related' => $self_url . '/parent',
-            'self' => $self_url . '/relationships/parent',
+            'related' => ['href' => $self_url . '/parent'],
+            'self' => ['href' => $self_url . '/relationships/parent'],
           ],
         ];
         break;
@@ -181,8 +181,8 @@ class TermTest extends ResourceTestBase {
             ],
           ],
           'links' => [
-            'related' => $self_url . '/parent',
-            'self' => $self_url . '/relationships/parent',
+            'related' => ['href' => $self_url . '/parent'],
+            'self' => ['href' => $self_url . '/relationships/parent'],
           ],
         ];
         break;
@@ -200,8 +200,8 @@ class TermTest extends ResourceTestBase {
             ],
           ],
           'links' => [
-            'related' => $self_url . '/parent',
-            'self' => $self_url . '/relationships/parent',
+            'related' => ['href' => $self_url . '/parent'],
+            'self' => ['href' => $self_url . '/relationships/parent'],
           ],
         ];
         break;
@@ -212,8 +212,8 @@ class TermTest extends ResourceTestBase {
       $expected_parent_normalization = [
         'data' => [],
         'links' => [
-          'related' => $self_url . '/parent',
-          'self' => $self_url . '/relationships/parent',
+          'related' => ['href' => $self_url . '/parent'],
+          'self' => ['href' => $self_url . '/relationships/parent'],
         ],
       ];
     }
@@ -222,19 +222,19 @@ class TermTest extends ResourceTestBase {
       'jsonapi' => [
         'meta' => [
           'links' => [
-            'self' => 'http://jsonapi.org/format/1.0/',
+            'self' => ['href' => 'http://jsonapi.org/format/1.0/'],
           ],
         ],
         'version' => '1.0',
       ],
       'links' => [
-        'self' => $self_url,
+        'self' => ['href' => $self_url],
       ],
       'data' => [
         'id' => $this->entity->uuid(),
         'type' => 'taxonomy_term--camelids',
         'links' => [
-          'self' => $self_url,
+          'self' => ['href' => $self_url],
         ],
         'attributes' => [
           'changed' => (new \DateTime())->setTimestamp($this->entity->getChangedTime())->setTimezone(new \DateTimeZone('UTC'))->format(\DateTime::RFC3339),
@@ -262,8 +262,8 @@ class TermTest extends ResourceTestBase {
               'type' => 'taxonomy_vocabulary--taxonomy_vocabulary',
             ],
             'links' => [
-              'related' => $self_url . '/vid',
-              'self' => $self_url . '/relationships/vid',
+              'related' => ['href' => $self_url . '/vid'],
+              'self' => ['href' => $self_url . '/relationships/vid'],
             ],
           ],
         ],
@@ -314,12 +314,16 @@ class TermTest extends ResourceTestBase {
         'jsonapi' => [
           'meta' => [
             'links' => [
-              'self' => 'http://jsonapi.org/format/1.0/',
+              'self' => ['href' => 'http://jsonapi.org/format/1.0/'],
             ],
           ],
           'version' => '1.0',
         ],
-        'links' => ['self' => static::getRelatedLink(static::toResourceIdentifier($this->entity), 'parent')],
+        'links' => [
+          'self' => [
+            'href' => static::getRelatedLink(static::toResourceIdentifier($this->entity), 'parent'),
+          ],
+        ],
       ]);
     }
     return $responses;

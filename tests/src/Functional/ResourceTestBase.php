@@ -145,7 +145,7 @@ abstract class ResourceTestBase extends BrowserTestBase {
   protected static $jsonApiMember = [
     'version' => '1.0',
     'meta' => [
-      'links' => ['self' => 'http://jsonapi.org/format/1.0/'],
+      'links' => ['self' => ['href' => 'http://jsonapi.org/format/1.0/']],
     ],
   ];
 
@@ -344,7 +344,9 @@ abstract class ResourceTestBase extends BrowserTestBase {
    */
   protected function normalize(EntityInterface $entity, Url $url) {
     $doc = new JsonApiDocumentTopLevel($entity, new NullEntityCollection(), [
-      'self' => $url->toString(TRUE)->getGeneratedUrl(),
+      'self' => [
+        'href' => $url->toString(TRUE)->getGeneratedUrl(),
+      ],
     ]);
     return $this->serializer->normalize($doc, 'api_json', [
       'resource_type' => $this->container->get('jsonapi.resource_type.repository')->getByTypeName(static::$resourceTypeName),
@@ -790,10 +792,10 @@ abstract class ResourceTestBase extends BrowserTestBase {
     $expected_error['status'] = $expected_status_code;
     $expected_error['detail'] = $expected_message;
     if ($via_link) {
-      $expected_error['links']['via'] = $via_link->setAbsolute()->toString();
+      $expected_error['links']['via']['href'] = $via_link->setAbsolute()->toString();
     }
     if ($info_url = HttpExceptionNormalizer::getInfoUrl($expected_status_code)) {
-      $expected_error['links']['info'] = $info_url;
+      $expected_error['links']['info']['href'] = $info_url;
     }
     if ($pointer !== FALSE) {
       $expected_error['source']['pointer'] = $pointer;
@@ -914,8 +916,8 @@ abstract class ResourceTestBase extends BrowserTestBase {
             'status' => 403,
             'detail' => "The current user is not allowed to GET the selected resource." . (strlen($reason) ? ' ' . $reason : ''),
             'links' => [
-              'info' => HttpExceptionNormalizer::getInfoUrl(403),
-              'via' => $url->setAbsolute()->toString(),
+              'info' => ['href' => HttpExceptionNormalizer::getInfoUrl(403)],
+              'via' => ['href' => $url->setAbsolute()->toString()],
             ],
             'source' => [
               'pointer' => '/data',
@@ -951,8 +953,8 @@ abstract class ResourceTestBase extends BrowserTestBase {
           'status' => 400,
           'detail' => "The following query parameters violate the JSON API spec: 'foo'.",
           'links' => [
-            'info' => 'http://jsonapi.org/format/#query-parameters',
-            'via' => $url_reserved_custom_query_parameter->toString(),
+            'info' => ['href' => 'http://jsonapi.org/format/#query-parameters'],
+            'via' => ['href' => $url_reserved_custom_query_parameter->toString()],
           ],
         ],
       ],
@@ -1644,8 +1646,8 @@ abstract class ResourceTestBase extends BrowserTestBase {
       'data' => $data,
       'jsonapi' => static::$jsonApiMember,
       'links' => [
-        'self' => $self_link,
-        'related' => $related_link,
+        'self' => ['href' => $self_link],
+        'related' => ['href' => $related_link],
       ],
     ];
   }
@@ -1774,7 +1776,7 @@ abstract class ResourceTestBase extends BrowserTestBase {
       ['entity' => $this->entity->uuid()],
       ['query' => ['include' => implode(',', $include_paths)]]
     )->setAbsolute()->toString();
-    $expected_document['links']['self'] = $self_link;
+    $expected_document['links']['self']['href'] = $self_link;
     // If there can be no included data, just return the response with the
     // updated 'self' link as is.
     if (empty($include_paths)) {
@@ -1902,8 +1904,8 @@ abstract class ResourceTestBase extends BrowserTestBase {
             'status' => 403,
             'detail' => "IDs should be properly generated and formatted UUIDs as described in RFC 4122.",
             'links' => [
-              'info' => HttpExceptionNormalizer::getInfoUrl(403),
-              'via' => $url->setAbsolute()->toString(),
+              'info' => ['href' => HttpExceptionNormalizer::getInfoUrl(403)],
+              'via' => ['href' => $url->setAbsolute()->toString()],
             ],
             'source' => [
               'pointer' => '/data/id',
@@ -2134,8 +2136,8 @@ abstract class ResourceTestBase extends BrowserTestBase {
           'status' => 403,
           'detail' => "The current user is not allowed to PATCH the selected field (field_rest_test).",
           'links' => [
-            'info' => HttpExceptionNormalizer::getInfoUrl(403),
-            'via' => $url->setAbsolute()->toString(),
+            'info' => ['href' => HttpExceptionNormalizer::getInfoUrl(403)],
+            'via' => ['href' => $url->setAbsolute()->toString()],
           ],
           'source' => [
             'pointer' => '/data/attributes/field_rest_test',
@@ -2159,8 +2161,8 @@ abstract class ResourceTestBase extends BrowserTestBase {
           'status' => 403,
           'detail' => "The current user is not allowed to PATCH the selected field ($id_field_name). The entity ID cannot be changed.",
           'links' => [
-            'info' => HttpExceptionNormalizer::getInfoUrl(403),
-            'via' => $url->setAbsolute()->toString(),
+            'info' => ['href' => HttpExceptionNormalizer::getInfoUrl(403)],
+            'via' => ['href' => $url->setAbsolute()->toString()],
           ],
           'source' => [
             'pointer' => '/data/attributes/' . $id_field_name,
@@ -2196,8 +2198,8 @@ abstract class ResourceTestBase extends BrowserTestBase {
           'status' => 403,
           'detail' => "The current user is not allowed to PATCH the selected field (field_rest_test).",
           'links' => [
-            'info' => HttpExceptionNormalizer::getInfoUrl(403),
-            'via' => $url->setAbsolute()->toString(),
+            'info' => ['href' => HttpExceptionNormalizer::getInfoUrl(403)],
+            'via' => ['href' => $url->setAbsolute()->toString()],
           ],
           'source' => [
             'pointer' => '/data/attributes/field_rest_test',
@@ -2225,8 +2227,8 @@ abstract class ResourceTestBase extends BrowserTestBase {
             'status' => 403,
             'detail' => "The current user is not allowed to PATCH the selected field (" . $patch_protected_field_name . ")." . ($reason !== NULL ? ' ' . $reason : ''),
             'links' => [
-              'info' => HttpExceptionNormalizer::getInfoUrl(403),
-              'via' => $url->setAbsolute()->toString(),
+              'info' => ['href' => HttpExceptionNormalizer::getInfoUrl(403)],
+              'via' => ['href' => $url->setAbsolute()->toString()],
             ],
             'source' => [
               'pointer' => '/data/attributes/' . $patch_protected_field_name,
@@ -2502,7 +2504,7 @@ abstract class ResourceTestBase extends BrowserTestBase {
         foreach ($field_set as $field_name) {
           $owner_resource['attributes'][$field_name] = $this->serializer->normalize($owner->get($field_name)[0]->get('value'), 'api_json');
         }
-        $owner_resource['links']['self'] = static::getResourceLink($owner_resource);
+        $owner_resource['links']['self']['href'] = static::getResourceLink($owner_resource);
         $expected_document['included'] = [$owner_resource];
         $expected_cacheability->addCacheableDependency($owner);
         $expected_cacheability->addCacheableDependency(static::entityAccess($owner, 'view', $this->account));
@@ -2524,7 +2526,7 @@ abstract class ResourceTestBase extends BrowserTestBase {
       }
       $url->setOption('query', $query);
       // 'self' link should include the 'fields' query param.
-      $expected_document['links']['self'] = $url->setAbsolute()->toString();
+      $expected_document['links']['self']['href'] = $url->setAbsolute()->toString();
 
       $response = $this->request('GET', $url, $request_options);
       // Dynamic Page Cache miss because cache should vary based on the 'field'

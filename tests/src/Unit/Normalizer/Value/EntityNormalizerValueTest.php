@@ -141,7 +141,7 @@ class EntityNormalizerValueTest extends UnitTestCase {
         'field_related' => ['data' => ['type' => 'node', 'id' => 2]],
       ],
       'links' => [
-        'self' => 'dummy_entity_link',
+        'self' => ['href' => 'dummy_entity_link'],
       ],
     ], $this->object->rasterizeValue());
   }

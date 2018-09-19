@@ -120,19 +120,19 @@ class UserTest extends ResourceTestBase {
       'jsonapi' => [
         'meta' => [
           'links' => [
-            'self' => 'http://jsonapi.org/format/1.0/',
+            'self' => ['href' => 'http://jsonapi.org/format/1.0/'],
           ],
         ],
         'version' => '1.0',
       ],
       'links' => [
-        'self' => $self_url,
+        'self' => ['href' => $self_url],
       ],
       'data' => [
         'id' => $this->entity->uuid(),
         'type' => 'user--user',
         'links' => [
-          'self' => $self_url,
+          'self' => ['href' => $self_url],
         ],
         'attributes' => [
           'created' => '1973-11-29T21:33:09+00:00',
@@ -298,8 +298,8 @@ class UserTest extends ResourceTestBase {
           'status' => 403,
           'detail' => 'The current user is not allowed to PATCH the selected field (name).',
           'links' => [
-            'info' => HttpExceptionNormalizer::getInfoUrl(403),
-            'via' => $url->setAbsolute()->toString(),
+            'info' => ['href' => HttpExceptionNormalizer::getInfoUrl(403)],
+            'via' => ['href' => $url->setAbsolute()->toString()],
           ],
           'source' => [
             'pointer' => '/data/attributes/name',
@@ -378,8 +378,8 @@ class UserTest extends ResourceTestBase {
           'status' => 403,
           'detail' => 'The current user is not allowed to PATCH the selected field (uid). The entity ID cannot be changed',
           'links' => [
-            'info' => HttpExceptionNormalizer::getInfoUrl(403),
-            'via' => $url->setAbsolute()->toString(),
+            'info' => ['href' => HttpExceptionNormalizer::getInfoUrl(403)],
+            'via' => ['href' => $url->setAbsolute()->toString()],
           ],
           'id' => '/user--user/' . $this->account->uuid(),
           'source' => [

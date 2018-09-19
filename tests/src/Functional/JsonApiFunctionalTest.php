@@ -40,7 +40,7 @@ class JsonApiFunctionalTest extends JsonApiFunctionalTestBase {
     ]));
     $this->assertSession()->statusCodeEquals(200);
     $this->assertEquals(OffsetPage::SIZE_MAX, count($collection_output['data']));
-    $this->assertContains('page%5Boffset%5D=53', $collection_output['links']['next']);
+    $this->assertContains('page%5Boffset%5D=53', $collection_output['links']['next']['href']);
     // 3. Load all articles (1st page, 2 items)
     $collection_output = Json::decode($this->drupalGet('/jsonapi/node/article', [
       'query' => ['page' => ['limit' => 2]],
@@ -58,7 +58,7 @@ class JsonApiFunctionalTest extends JsonApiFunctionalTestBase {
     ]));
     $this->assertSession()->statusCodeEquals(200);
     $this->assertEquals(2, count($collection_output['data']));
-    $this->assertContains('page%5Boffset%5D=4', $collection_output['links']['next']);
+    $this->assertContains('page%5Boffset%5D=4', $collection_output['links']['next']['href']);
     // 5. Single article.
     $uuid = $this->nodes[0]->uuid();
     $single_output = Json::decode($this->drupalGet('/jsonapi/node/article/' . $uuid));
@@ -108,7 +108,7 @@ class JsonApiFunctionalTest extends JsonApiFunctionalTestBase {
     $this->assertArrayNotHasKey('tid', $single_output['data'][0]['attributes']);
     $this->assertContains(
       '/taxonomy_term/tags/',
-      $single_output['data'][0]['links']['self']
+      $single_output['data'][0]['links']['self']['href']
     );
     $this->assertEquals(
       'taxonomy_vocabulary--taxonomy_vocabulary',
@@ -561,7 +561,7 @@ class JsonApiFunctionalTest extends JsonApiFunctionalTestBase {
     $this->assertArrayNotHasKey('uuid', $created_response['data']['attributes']);
     $uuid = $created_response['data']['id'];
     $this->assertEquals(2, count($created_response['data']['relationships']['field_tags']['data']));
-    $this->assertEquals($created_response['data']['links']['self'], $response->getHeader('Location')[0]);
+    $this->assertEquals($created_response['data']['links']['self']['href'], $response->getHeader('Location')[0]);
 
     // 2. Authorization error.
     $response = $this->request('POST', $collection_url, [

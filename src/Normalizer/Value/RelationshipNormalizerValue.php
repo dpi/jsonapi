@@ -153,7 +153,7 @@ class RelationshipNormalizerValue extends FieldNormalizerValue {
     $route_parameters = [
       'related' => $relationship_field_name,
     ];
-    $links['self'] = $this->linkManager->getEntityLink(
+    $links['self']['href'] = $this->linkManager->getEntityLink(
       $this->hostEntityId,
       $this->resourceType,
       $route_parameters,
@@ -161,7 +161,7 @@ class RelationshipNormalizerValue extends FieldNormalizerValue {
     );
     $resource_types = $this->resourceType->getRelatableResourceTypesByField($field_name);
     if (static::hasNonInternalResourceType($resource_types)) {
-      $links['related'] = $this->linkManager->getEntityLink(
+      $links['related']['href'] = $this->linkManager->getEntityLink(
         $this->hostEntityId,
         $this->resourceType,
         $route_parameters,

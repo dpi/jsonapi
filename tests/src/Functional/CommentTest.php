@@ -135,19 +135,19 @@ class CommentTest extends ResourceTestBase {
       'jsonapi' => [
         'meta' => [
           'links' => [
-            'self' => 'http://jsonapi.org/format/1.0/',
+            'self' => ['href' => 'http://jsonapi.org/format/1.0/'],
           ],
         ],
         'version' => '1.0',
       ],
       'links' => [
-        'self' => $self_url,
+        'self' => ['href' => $self_url],
       ],
       'data' => [
         'id' => $this->entity->uuid(),
         'type' => 'comment--comment',
         'links' => [
-          'self' => $self_url,
+          'self' => ['href' => $self_url],
         ],
         'attributes' => [
           'created' => '1973-11-29T21:33:09+00:00',
@@ -175,8 +175,8 @@ class CommentTest extends ResourceTestBase {
               'type' => 'user--user',
             ],
             'links' => [
-              'related' => $self_url . '/uid',
-              'self' => $self_url . '/relationships/uid',
+              'related' => ['href' => $self_url . '/uid'],
+              'self' => ['href' => $self_url . '/relationships/uid'],
             ],
           ],
           'comment_type' => [
@@ -185,8 +185,8 @@ class CommentTest extends ResourceTestBase {
               'type' => 'comment_type--comment_type',
             ],
             'links' => [
-              'related' => $self_url . '/comment_type',
-              'self' => $self_url . '/relationships/comment_type',
+              'related' => ['href' => $self_url . '/comment_type'],
+              'self' => ['href' => $self_url . '/relationships/comment_type'],
             ],
           ],
           'entity_id' => [
@@ -195,15 +195,15 @@ class CommentTest extends ResourceTestBase {
               'type' => 'entity_test--bar',
             ],
             'links' => [
-              'related' => $self_url . '/entity_id',
-              'self' => $self_url . '/relationships/entity_id',
+              'related' => ['href' => $self_url . '/entity_id'],
+              'self' => ['href' => $self_url . '/relationships/entity_id'],
             ],
           ],
           'pid' => [
             'data' => NULL,
             'links' => [
-              'related' => $self_url . '/pid',
-              'self' => $self_url . '/relationships/pid',
+              'related' => ['href' => $self_url . '/pid'],
+              'self' => ['href' => $self_url . '/relationships/pid'],
             ],
           ],
         ],

@@ -60,7 +60,9 @@ class JsonApiDocumentTopLevel {
    */
   public function __construct($data, EntityCollection $includes, array $links, array $meta = []) {
     assert(!$data instanceof ErrorCollection || $includes instanceof NullEntityCollection);
-    assert(Inspector::assertAllStrings($links));
+    assert(Inspector::assertAll(function ($link) {
+      return is_array($link) || isset($link['href']) && is_string($link['href']);
+    }, $links));
 
     $this->data = $data;
     $this->includes = $includes;

@@ -113,7 +113,9 @@ class JsonApiDocumentTopLevelNormalizerValue implements ValueExtractorInterface,
 
       $this->cardinality = $cardinality;
 
-      assert(Inspector::assertAllStrings($links));
+      assert(Inspector::assertAll(function ($link) {
+        return is_array($link) || isset($link['href']) && is_string($link['href']);
+      }, $links));
       $this->links = $links;
 
       $this->meta = $meta;
@@ -140,7 +142,11 @@ class JsonApiDocumentTopLevelNormalizerValue implements ValueExtractorInterface,
       'jsonapi' => [
         'version' => JsonApiSpec::SUPPORTED_SPECIFICATION_VERSION,
         'meta' => [
-          'links' => ['self' => JsonApiSpec::SUPPORTED_SPECIFICATION_PERMALINK],
+          'links' => [
+            'self' => [
+              'href' => JsonApiSpec::SUPPORTED_SPECIFICATION_PERMALINK,
+            ],
+          ],
         ],
       ],
     ];
@@ -164,7 +170,9 @@ class JsonApiDocumentTopLevelNormalizerValue implements ValueExtractorInterface,
           $rasterized['meta']['omitted'] = [
             'detail' => 'Some resources have been omitted because of insufficient authorization.',
             'links' => [
-              'help' => 'https://www.drupal.org/docs/8/modules/json-api/filtering#filters-access-control',
+              'help' => [
+                'href' => 'https://www.drupal.org/docs/8/modules/json-api/filtering#filters-access-control',
+              ],
             ],
           ];
         }
@@ -177,9 +185,9 @@ class JsonApiDocumentTopLevelNormalizerValue implements ValueExtractorInterface,
           // random salt and the link href. This ensures that the key is non-
           // deterministic while letting use deduplicate the links by their
           // href. The salt is *not* used for any cryptographic reason.
-          $link_key = 'item:' . static::getLinkHash($link_hash_salt, $error['links']['via']);
+          $link_key = 'item:' . static::getLinkHash($link_hash_salt, $error['links']['via']['href']);
           $rasterized['meta']['omitted']['links'][$link_key] = [
-            'href' => $error['links']['via'],
+            'href' => $error['links']['via']['href'],
             'meta' => [
               'rel' => 'item',
               'detail' => $error['detail'],

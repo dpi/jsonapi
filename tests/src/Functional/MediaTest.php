@@ -138,19 +138,19 @@ class MediaTest extends ResourceTestBase {
       'jsonapi' => [
         'meta' => [
           'links' => [
-            'self' => 'http://jsonapi.org/format/1.0/',
+            'self' => ['href' => 'http://jsonapi.org/format/1.0/'],
           ],
         ],
         'version' => '1.0',
       ],
       'links' => [
-        'self' => $self_url,
+        'self' => ['href' => $self_url],
       ],
       'data' => [
         'id' => $this->entity->uuid(),
         'type' => 'media--camelids',
         'links' => [
-          'self' => $self_url,
+          'self' => ['href' => $self_url],
         ],
         'attributes' => [
           'vid' => 1,
@@ -177,8 +177,10 @@ class MediaTest extends ResourceTestBase {
               'type' => 'file--file',
             ],
             'links' => [
-              'related' => $self_url . '/field_media_file',
-              'self' => $self_url . '/relationships/field_media_file',
+              'related' => ['href' => $self_url . '/field_media_file'],
+              'self' => [
+                'href' => $self_url . '/relationships/field_media_file',
+              ],
             ],
           ],
           'thumbnail' => [
@@ -193,8 +195,8 @@ class MediaTest extends ResourceTestBase {
               'type' => 'file--file',
             ],
             'links' => [
-              'related' => $self_url . '/thumbnail',
-              'self' => $self_url . '/relationships/thumbnail',
+              'related' => ['href' => $self_url . '/thumbnail'],
+              'self' => ['href' => $self_url . '/relationships/thumbnail'],
             ],
           ],
           'bundle' => [
@@ -203,8 +205,8 @@ class MediaTest extends ResourceTestBase {
               'type' => 'media_type--media_type',
             ],
             'links' => [
-              'related' => $self_url . '/bundle',
-              'self' => $self_url . '/relationships/bundle',
+              'related' => ['href' => $self_url . '/bundle'],
+              'self' => ['href' => $self_url . '/relationships/bundle'],
             ],
           ],
           'uid' => [
@@ -213,8 +215,8 @@ class MediaTest extends ResourceTestBase {
               'type' => 'user--user',
             ],
             'links' => [
-              'related' => $self_url . '/uid',
-              'self' => $self_url . '/relationships/uid',
+              'related' => ['href' => $self_url . '/uid'],
+              'self' => ['href' => $self_url . '/relationships/uid'],
             ],
           ],
           'revision_user' => [
@@ -223,8 +225,8 @@ class MediaTest extends ResourceTestBase {
               'type' => 'user--user',
             ],
             'links' => [
-              'related' => $self_url . '/revision_user',
-              'self' => $self_url . '/relationships/revision_user',
+              'related' => ['href' => $self_url . '/revision_user'],
+              'self' => ['href' => $self_url . '/relationships/revision_user'],
             ],
           ],
         ],

@@ -87,19 +87,19 @@ class BlockContentTest extends ResourceTestBase {
       'jsonapi' => [
         'meta' => [
           'links' => [
-            'self' => 'http://jsonapi.org/format/1.0/',
+            'self' => ['href' => 'http://jsonapi.org/format/1.0/'],
           ],
         ],
         'version' => '1.0',
       ],
       'links' => [
-        'self' => $self_url,
+        'self' => ['href' => $self_url],
       ],
       'data' => [
         'id' => $this->entity->uuid(),
         'type' => 'block_content--basic',
         'links' => [
-          'self' => $self_url,
+          'self' => ['href' => $self_url],
         ],
         'attributes' => [
           'body' => [
@@ -126,15 +126,15 @@ class BlockContentTest extends ResourceTestBase {
               'type' => 'block_content_type--block_content_type',
             ],
             'links' => [
-              'related' => $self_url . '/block_content_type',
-              'self' => $self_url . '/relationships/block_content_type',
+              'related' => ['href' => $self_url . '/block_content_type'],
+              'self' => ['href' => $self_url . '/relationships/block_content_type'],
             ],
           ],
           'revision_user' => [
             'data' => NULL,
             'links' => [
-              'related' => $self_url . '/revision_user',
-              'self' => $self_url . '/relationships/revision_user',
+              'related' => ['href' => $self_url . '/revision_user'],
+              'self' => ['href' => $self_url . '/relationships/revision_user'],
             ],
           ],
         ],

@@ -250,7 +250,7 @@ class JsonApiDocumentTopLevelNormalizerTest extends JsonapiKernelTestBase {
 
     // @see http://jsonapi.org/format/#document-jsonapi-object
     $this->assertEquals($normalized['jsonapi']['version'], '1.0');
-    $this->assertEquals($normalized['jsonapi']['meta']['links']['self'], 'http://jsonapi.org/format/1.0/');
+    $this->assertEquals($normalized['jsonapi']['meta']['links']['self']['href'], 'http://jsonapi.org/format/1.0/');
 
     $this->assertSame($normalized['data']['attributes']['title'], 'dummy_title');
     $this->assertEquals($normalized['data']['id'], $this->node->uuid());
@@ -260,8 +260,8 @@ class JsonApiDocumentTopLevelNormalizerTest extends JsonapiKernelTestBase {
         'id' => NodeType::load('article')->uuid(),
       ],
       'links' => [
-        'self' => 'dummy_entity_link',
-        'related' => 'dummy_entity_link',
+        'self' => ['href' => 'dummy_entity_link'],
+        'related' => ['href' => 'dummy_entity_link'],
       ],
     ], $normalized['data']['relationships']['node_type']);
     $this->assertTrue(!isset($normalized['data']['attributes']['created']));
@@ -278,8 +278,8 @@ class JsonApiDocumentTopLevelNormalizerTest extends JsonapiKernelTestBase {
         'id' => $this->user->uuid(),
       ],
       'links' => [
-        'self' => 'dummy_entity_link',
-        'related' => 'dummy_entity_link',
+        'self' => ['href' => 'dummy_entity_link'],
+        'related' => ['href' => 'dummy_entity_link'],
       ],
     ], $normalized['data']['relationships']['uid']);
     $this->assertTrue(empty($normalized['meta']['omitted']));
@@ -407,8 +407,10 @@ class JsonApiDocumentTopLevelNormalizerTest extends JsonapiKernelTestBase {
     $this->assertEquals(400, $normalized['errors'][0]['status']);
     $this->assertEquals('Lorem', $normalized['errors'][0]['detail']);
     $this->assertEquals([
-      'info' => 'http://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html#sec10.4.1',
-      'via' => 'http://localhost/',
+      'info' => [
+        'href' => 'http://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html#sec10.4.1',
+      ],
+      'via' => ['href' => 'http://localhost/'],
     ], $normalized['errors'][0]['links']);
   }
 

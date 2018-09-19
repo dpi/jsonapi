@@ -124,16 +124,16 @@ class LinkManager {
     $links = [];
     // Check if this is not the last page.
     if ($link_context['has_next_page']) {
-      $links['next'] = $this->getRequestLink($request, $this->getPagerQueries('next', $offset, $size, $query));
+      $links['next']['href'] = $this->getRequestLink($request, $this->getPagerQueries('next', $offset, $size, $query));
 
       if (!empty($total)) {
-        $links['last'] = $this->getRequestLink($request, $this->getPagerQueries('last', $offset, $size, $query, $total));
+        $links['last']['href'] = $this->getRequestLink($request, $this->getPagerQueries('last', $offset, $size, $query, $total));
       }
     }
     // Check if this is not the first page.
     if ($offset > 0) {
-      $links['first'] = $this->getRequestLink($request, $this->getPagerQueries('first', $offset, $size, $query));
-      $links['prev'] = $this->getRequestLink($request, $this->getPagerQueries('prev', $offset, $size, $query));
+      $links['first']['href'] = $this->getRequestLink($request, $this->getPagerQueries('first', $offset, $size, $query));
+      $links['prev']['href'] = $this->getRequestLink($request, $this->getPagerQueries('prev', $offset, $size, $query));
     }
 
     return $links;

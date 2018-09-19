@@ -76,7 +76,7 @@ trait ResourceResponseTestTrait {
     $merged_document['jsonapi'] = [
       'meta' => [
         'links' => [
-          'self' => 'http://jsonapi.org/format/1.0/',
+          'self' => ['href' => 'http://jsonapi.org/format/1.0/'],
         ],
       ],
       'version' => '1.0',
@@ -92,7 +92,11 @@ trait ResourceResponseTestTrait {
       if (!isset($merged_document['data'])) {
         $merged_document['data'] = $is_multiple ? [] : NULL;
       }
-      $merged_document['links'] = ['self' => $self_link];
+      $merged_document['links'] = [
+        'self' => [
+          'href' => $self_link,
+        ],
+      ];
     }
     // All collections should be 200, without regard for the status of the
     // individual resources in those collections.
@@ -280,7 +284,7 @@ trait ResourceResponseTestTrait {
     assert($type === 'relationship' || $type === 'related');
     return array_reduce($relationship_field_names, function ($link_paths, $relationship_field_name) use ($type) {
       $tail = $type === 'relationship' ? 'self' : $type;
-      $link_paths[$relationship_field_name] = "data.relationships.$relationship_field_name.links.$tail";
+      $link_paths[$relationship_field_name] = "data.relationships.$relationship_field_name.links.$tail.href";
       return $link_paths;
     }, []);
   }
@@ -461,14 +465,14 @@ trait ResourceResponseTestTrait {
       'title' => 'Forbidden',
       'detail' => $detail,
       'links' => [
-        'info' => HttpExceptionNormalizer::getInfoUrl(403),
+        'info' => ['href' => HttpExceptionNormalizer::getInfoUrl(403)],
       ],
     ];
     if ($pointer || $pointer !== FALSE && $relationship_field_name) {
       $error['source']['pointer'] = ($pointer) ? $pointer : $relationship_field_name;
     }
     if ($via_link) {
-      $error['links']['via'] = $via_link->setAbsolute()->toString();
+      $error['links']['via']['href'] = $via_link->setAbsolute()->toString();
     }
 
     return (new ResourceResponse([
@@ -497,7 +501,7 @@ trait ResourceResponseTestTrait {
       // relationships should be an empty array.
       'data' => $cardinality === 1 ? NULL : [],
       'jsonapi' => static::$jsonApiMember,
-      'links' => ['self' => $self_link],
+      'links' => ['self' => ['href' => $self_link]],
     ]);
   }
 
@@ -536,12 +540,14 @@ trait ResourceResponseTestTrait {
     $omitted = [
       'detail' => 'Some resources have been omitted because of insufficient authorization.',
       'links' => [
-        'help' => 'https://www.drupal.org/docs/8/modules/json-api/filtering#filters-access-control',
+        'help' => [
+          'href' => 'https://www.drupal.org/docs/8/modules/json-api/filtering#filters-access-control',
+        ],
       ],
     ];
     foreach ($errors as $error) {
-      $omitted['links']['item:' . substr(Crypt::hashBase64($error['links']['via']), 0, 7)] = [
-        'href' => $error['links']['via'],
+      $omitted['links']['item:' . substr(Crypt::hashBase64($error['links']['via']['href']), 0, 7)] = [
+        'href' => $error['links']['via']['href'],
         'meta' => [
           'detail' => $error['detail'],
           'rel' => 'item',
@@ -564,7 +570,7 @@ trait ResourceResponseTestTrait {
    */
   protected static function mergeOmittedObjects(array $a, array $b) {
     $merged['detail'] = 'Some resources have been omitted because of insufficient authorization.';
-    $merged['links']['help'] = 'https://www.drupal.org/docs/8/modules/json-api/filtering#filters-access-control';
+    $merged['links']['help']['href'] = 'https://www.drupal.org/docs/8/modules/json-api/filtering#filters-access-control';
     $a_links = array_diff_key($a['links'], array_flip(['help']));
     $b_links = array_diff_key($b['links'], array_flip(['help']));
     foreach (array_merge($a_links, $b_links) as $link) {

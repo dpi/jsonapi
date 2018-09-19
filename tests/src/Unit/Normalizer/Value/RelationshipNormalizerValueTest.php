@@ -105,8 +105,8 @@ class RelationshipNormalizerValueTest extends UnitTestCase {
     $img2->getCacheMaxAge()->willReturn(50);
 
     $links = [
-      'self' => 'dummy_entity_link',
-      'related' => 'dummy_entity_link',
+      'self' => ['href' => 'dummy_entity_link'],
+      'related' => ['href' => 'dummy_entity_link'],
     ];
     return [
       'single cardinality' => [[$uid1->reveal()], 1, [

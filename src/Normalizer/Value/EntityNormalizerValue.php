@@ -79,14 +79,12 @@ class EntityNormalizerValue implements ValueExtractorInterface, CacheableDepende
       'attributes' => [],
       'relationships' => [],
     ];
-    $rasterized['links'] = [
-      'self' => $this->linkManager->getEntityLink(
-        $rasterized['id'],
-        $this->context['resource_type'],
-        [],
-        'individual'
-      ),
-    ];
+    $rasterized['links']['self']['href'] = $this->linkManager->getEntityLink(
+      $rasterized['id'],
+      $this->context['resource_type'],
+      [],
+      'individual'
+    );
 
     foreach ($this->getValues() as $field_name => $normalizer_value) {
       $rasterized[$normalizer_value->getPropertyType()][$field_name] = $normalizer_value->rasterizeValue();

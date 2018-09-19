@@ -117,19 +117,19 @@ class NodeTest extends ResourceTestBase {
       'jsonapi' => [
         'meta' => [
           'links' => [
-            'self' => 'http://jsonapi.org/format/1.0/',
+            'self' => ['href' => 'http://jsonapi.org/format/1.0/'],
           ],
         ],
         'version' => '1.0',
       ],
       'links' => [
-        'self' => $self_url,
+        'self' => ['href' => $self_url],
       ],
       'data' => [
         'id' => $this->entity->uuid(),
         'type' => 'node--camelids',
         'links' => [
-          'self' => $self_url,
+          'self' => ['href' => $self_url],
         ],
         'attributes' => [
           'created' => '1973-11-29T21:33:09+00:00',
@@ -159,8 +159,8 @@ class NodeTest extends ResourceTestBase {
               'type' => 'node_type--node_type',
             ],
             'links' => [
-              'related' => $self_url . '/node_type',
-              'self' => $self_url . '/relationships/node_type',
+              'related' => ['href' => $self_url . '/node_type'],
+              'self' => ['href' => $self_url . '/relationships/node_type'],
             ],
           ],
           'uid' => [
@@ -169,8 +169,8 @@ class NodeTest extends ResourceTestBase {
               'type' => 'user--user',
             ],
             'links' => [
-              'related' => $self_url . '/uid',
-              'self' => $self_url . '/relationships/uid',
+              'related' => ['href' => $self_url . '/uid'],
+              'self' => ['href' => $self_url . '/relationships/uid'],
             ],
           ],
           'revision_uid' => [
@@ -179,8 +179,8 @@ class NodeTest extends ResourceTestBase {
               'type' => 'user--user',
             ],
             'links' => [
-              'related' => $self_url . '/revision_uid',
-              'self' => $self_url . '/relationships/revision_uid',
+              'related' => ['href' => $self_url . '/revision_uid'],
+              'self' => ['href' => $self_url . '/relationships/revision_uid'],
             ],
           ],
         ],
@@ -257,8 +257,8 @@ class NodeTest extends ResourceTestBase {
           'status' => 403,
           'detail' => "The current user is not allowed to PATCH the selected field (path). The following permissions are required: 'create url aliases' OR 'administer url aliases'.",
           'links' => [
-            'info' => HttpExceptionNormalizer::getInfoUrl(403),
-            'via' => $url->setAbsolute()->toString(),
+            'info' => ['href' => HttpExceptionNormalizer::getInfoUrl(403)],
+            'via' => ['href' => $url->setAbsolute()->toString()],
           ],
           'source' => [
             'pointer' => '/data/attributes/path',
@@ -304,8 +304,8 @@ class NodeTest extends ResourceTestBase {
           'status' => 403,
           'detail' => 'The current user is not allowed to GET the selected resource.',
           'links' => [
-            'info' => HttpExceptionNormalizer::getInfoUrl(403),
-            'via' => $url->setAbsolute()->toString(),
+            'info' => ['href' => HttpExceptionNormalizer::getInfoUrl(403)],
+            'via' => ['href' => $url->setAbsolute()->toString()],
           ],
           'source' => [
             'pointer' => '/data',

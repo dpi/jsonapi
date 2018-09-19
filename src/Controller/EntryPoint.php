@@ -100,10 +100,10 @@ class EntryPoint extends ControllerBase {
         if ($resource_type->isLocatable() || $resource_type->isMutable()) {
           $route_suffix = $resource_type->isLocatable() ? 'collection' : 'collection.post';
           $url = Url::fromRoute(sprintf('jsonapi.%s.%s', $resource_type->getTypeName(), $route_suffix))->setAbsolute();
-          $carry[$resource_type->getTypeName()] = $url->toString();
+          $carry[$resource_type->getTypeName()] = ['href' => $url->toString()];
         }
         return $carry;
-      }, ['self' => $self->toString()]);
+      }, ['self' => ['href' => $self->toString()]]);
     };
     $urls = $this->renderer->executeInRenderContext($context, $do_build_urls);
     if (!$context->isEmpty()) {
@@ -115,7 +115,7 @@ class EntryPoint extends ControllerBase {
       $me_url = Url::fromRoute('jsonapi.user--user.individual', ['entity' => User::load($this->user->id())->uuid()])
         ->setAbsolute()
         ->toString(TRUE);
-      $meta['links']['me'] = $me_url->getGeneratedUrl();
+      $meta['links']['me'] = ['href' => $me_url->getGeneratedUrl()];
       // The cacheability of the `me` URL is the cacheability of that URL itself
       // and the currently authenticated user.
       $cacheability = $cacheability->merge($me_url)->addCacheContexts(['user']);

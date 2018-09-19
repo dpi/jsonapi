@@ -63,7 +63,9 @@ class LinkManagerTest extends UnitTestCase {
     // Add the extra stuff to the expected query.
     $pages = array_filter($pages);
     $pages = array_map(function ($page) {
-      return 'https://example.com/drupal/jsonapi/node/article/07c870e9-491b-4173-8e2b-4e059400af72?amet=pax&page%5Boffset%5D=' . $page['offset'] . '&page%5Blimit%5D=' . $page['limit'];
+      return [
+        'href' => 'https://example.com/drupal/jsonapi/node/article/07c870e9-491b-4173-8e2b-4e059400af72?amet=pax&page%5Boffset%5D=' . $page['offset'] . '&page%5Blimit%5D=' . $page['limit'],
+      ];
     }, $pages);
 
     $request = $this->prophesize(Request::class);
