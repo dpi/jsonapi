@@ -7,7 +7,7 @@ use Drupal\Core\Entity\EntityInterface;
 use Drupal\entity_test\Entity\EntityTestBundle;
 use Drupal\entity_test\Entity\EntityTestNoLabel;
 use Drupal\entity_test\Entity\EntityTestWithBundle;
-use Drupal\field\Tests\EntityReference\EntityReferenceTestTrait;
+use Drupal\jsonapi\BackwardCompatibility\tests\Traits\EntityReferenceTestTrait;
 use Drupal\Tests\BrowserTestBase;
 
 /**
