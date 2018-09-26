@@ -61,7 +61,7 @@ class EntityNormalizerValue implements ValueExtractorInterface, CacheableDepende
     $this->setCacheability(static::mergeCacheableDependencies(array_merge([$entity], $values)));
 
     $this->values = array_filter($values, function ($value) {
-      return !($value instanceof NullFieldNormalizerValue || $value instanceof IncludeOnlyRelationshipNormalizerValue);
+      return !($value instanceof NullFieldNormalizerValue);
     });
     $this->context = $context;
     $this->entity = $entity;

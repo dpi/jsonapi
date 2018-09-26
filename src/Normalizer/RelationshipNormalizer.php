@@ -4,7 +4,6 @@ namespace Drupal\jsonapi\Normalizer;
 
 use Drupal\Core\Access\AccessResult;
 use Drupal\Core\Entity\EntityFieldManagerInterface;
-use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Entity\EntityRepositoryInterface;
 use Drupal\jsonapi\JsonApiResource\ResourceIdentifier;
 use Drupal\jsonapi\Normalizer\Value\RelationshipNormalizerValue;
@@ -208,37 +207,6 @@ class RelationshipNormalizer extends NormalizerBase implements DenormalizerInter
     // @see \Drupal\jsonapi\Normalizer\RelationshipItemNormalizer::normalize()
     $relationship_access = AccessResult::allowed()->addCacheableDependency($relationship);
     return new RelationshipNormalizerValue($relationship_access, $normalizer_items, $cardinality, $link_context);
-  }
-
-  /**
-   * Builds the sub-context for the relationship include.
-   *
-   * @param array $context
-   *   The serialization context.
-   * @param \Drupal\Core\Entity\EntityInterface $entity
-   *   The related entity.
-   * @param string $host_field_name
-   *   The name of the field reference.
-   *
-   * @return array
-   *   The modified new context.
-   *
-   * @see EntityReferenceItemNormalizer::buildSubContext()
-   * @todo This is duplicated code from the reference item. Reuse code instead.
-   */
-  protected function buildSubContext(array $context, EntityInterface $entity, $host_field_name) {
-    // Swap out the context for the context of the referenced resource.
-    $context['resource_type'] = $this->resourceTypeRepository
-      ->get($entity->getEntityTypeId(), $entity->bundle());
-    // Since we're going one level down the only includes we need are the ones
-    // that apply to this level as well.
-    $include_candidates = array_filter($context['include'], function ($include) use ($host_field_name) {
-      return strpos($include, $host_field_name . '.') === 0;
-    });
-    $context['include'] = array_map(function ($include) use ($host_field_name) {
-      return str_replace($host_field_name . '.', '', $include);
-    }, $include_candidates);
-    return $context;
   }
 
 }
