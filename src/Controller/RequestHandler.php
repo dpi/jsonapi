@@ -4,11 +4,6 @@ namespace Drupal\jsonapi\Controller;
 
 use Drupal\jsonapi\ResourceType\ResourceType;
 use Symfony\Component\HttpFoundation\Request;
-use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
-use Symfony\Component\HttpKernel\Exception\UnprocessableEntityHttpException;
-use Symfony\Component\Serializer\Exception\InvalidArgumentException;
-use Symfony\Component\Serializer\Exception\UnexpectedValueException;
-use Symfony\Component\Serializer\SerializerInterface;
 
 /**
  * Acts as request forwarder for \Drupal\jsonapi\Controller\EntityResource.
@@ -16,13 +11,6 @@ use Symfony\Component\Serializer\SerializerInterface;
  * @internal
  */
 class RequestHandler {
-
-  /**
-   * The JSON API serializer.
-   *
-   * @var \Drupal\jsonapi\Serializer\Serializer
-   */
-  protected $serializer;
 
   /**
    * The JSON API entity resource controller.
@@ -34,13 +22,10 @@ class RequestHandler {
   /**
    * Creates a new RequestHandler instance.
    *
-   * @param \Symfony\Component\Serializer\SerializerInterface $serializer
-   *   The JSON API serializer.
    * @param \Drupal\jsonapi\Controller\EntityResource $entity_resource
    *   The JSON API entity resource controller.
    */
-  public function __construct(SerializerInterface $serializer, EntityResource $entity_resource) {
-    $this->serializer = $serializer;
+  public function __construct(EntityResource $entity_resource) {
     $this->entityResource = $entity_resource;
   }
 
@@ -56,8 +41,6 @@ class RequestHandler {
    *   The response object.
    */
   public function handle(Request $request, ResourceType $resource_type) {
-    $unserialized = $this->deserialize($request, $resource_type);
-
     // Determine the request parameters that should be passed to the resource
     // plugin.
     $parameters = ['resource_type' => $resource_type];
@@ -73,72 +56,15 @@ class RequestHandler {
     // Invoke the operation on the resource plugin.
     $action = $this->action($request, $resource_type);
 
-    // Only add the unserialized data if there is something there.
-    $extra_parameters = !is_null($unserialized) ? [$unserialized, $request] : [$request];
-
-    return call_user_func_array([$this->entityResource, $action], array_merge($parameters, $extra_parameters));
-  }
-
-  /**
-   * Deserializes request body, if any.
-   *
-   * @param \Symfony\Component\HttpFoundation\Request $request
-   *   The HTTP request object.
-   * @param \Drupal\jsonapi\ResourceType\ResourceType $resource_type
-   *   The JSON API resource type for the current request.
-   *
-   * @return array|null
-   *   An object normalization, if there is a valid request body. NULL if there
-   *   is no request body.
-   *
-   * @throws \Symfony\Component\HttpKernel\Exception\BadRequestHttpException
-   *   Thrown if the request body cannot be decoded, or when no request body was
-   *   provided with a POST or PATCH request.
-   * @throws \Symfony\Component\HttpKernel\Exception\UnprocessableEntityHttpException
-   *   Thrown if the request body cannot be denormalized.
-   */
-  protected function deserialize(Request $request, ResourceType $resource_type) {
-    if ($request->isMethodSafe(FALSE)) {
-      return NULL;
+    // Add the deserialized entity or relationship if available.
+    if ($request->get('serialization_class', FALSE) && !$request->isMethodCacheable()) {
+      $parameters[] = $request->get('deserialized');
     }
 
-    // Deserialize incoming data if available.
-    $received = $request->getContent();
-    $unserialized = NULL;
-    if (!empty($received)) {
-      // First decode the request data. We can then determine if the
-      // serialized data was malformed.
-      try {
-        $unserialized = $this->serializer->decode($received, 'api_json');
-      }
-      catch (UnexpectedValueException $e) {
-        // If an exception was thrown at this stage, there was a problem
-        // decoding the data. Throw a 400 http exception.
-        throw new BadRequestHttpException($e->getMessage());
-      }
+    // Add the request as a parameter.
+    $parameters[] = $request;
 
-      $field_related = $resource_type->getInternalName($request->get('related'));
-      try {
-        $unserialized = $this->serializer->denormalize($unserialized, $request->get('serialization_class'), 'api_json', [
-          'related' => $field_related,
-          'target_entity' => $request->get($resource_type->getEntityTypeId()),
-          'resource_type' => $resource_type,
-        ]);
-      }
-      // These two serialization exception types mean there was a problem with
-      // the structure of the decoded data and it's not valid.
-      catch (UnexpectedValueException $e) {
-        throw new UnprocessableEntityHttpException($e->getMessage());
-      }
-      catch (InvalidArgumentException $e) {
-        throw new UnprocessableEntityHttpException($e->getMessage());
-      }
-    }
-    elseif ($request->isMethod('POST') || $request->isMethod('PATCH')) {
-      throw new BadRequestHttpException('Empty request body.');
-    }
-
-    return $unserialized;
+    return call_user_func_array([$this->entityResource, $action], $parameters);
   }
 
   /**

@@ -655,7 +655,7 @@ class EntityResource {
    *
    * @todo: add `array` type hint to $resource_identifiers in https://www.drupal.org/project/jsonapi/issues/2987610
    */
-  public function removeFromRelationshipData(ResourceType $resource_type, EntityInterface $entity, $related_field, $resource_identifiers, Request $request = NULL) {
+  public function removeFromRelationshipData(ResourceType $resource_type, EntityInterface $entity, $related_field, $resource_identifiers, Request $request) {
     if ($resource_identifiers instanceof Request) {
       // This usually means that there was not body provided.
       throw new BadRequestHttpException(sprintf('You need to provide a body for DELETE operations on a relationship (%s).', $related_field));

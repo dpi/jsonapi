@@ -28,6 +28,7 @@ use Drupal\jsonapi\JsonApiResource\NullEntityCollection;
 use Drupal\jsonapi\Normalizer\HttpExceptionNormalizer;
 use Drupal\jsonapi\JsonApiResource\JsonApiDocumentTopLevel;
 use Drupal\jsonapi\ResourceResponse;
+use Drupal\jsonapi\Serializer\Serializer;
 use Drupal\path\Plugin\Field\FieldType\PathItem;
 use Drupal\Tests\BrowserTestBase;
 use Drupal\user\Entity\Role;
@@ -1842,13 +1843,6 @@ abstract class ResourceTestBase extends BrowserTestBase {
 
     $request_options[RequestOptions::HEADERS]['Content-Type'] = 'application/vnd.api+json';
 
-    // DX: 403 when unauthorized.
-    $response = $this->request('POST', $url, $request_options);
-    $reason = $this->getExpectedUnauthorizedAccessMessage('POST');
-    $this->assertResourceErrorResponse(403, (string) $reason, $url, $response, FALSE);
-
-    $this->setUpAuthorization('POST');
-
     // DX: 400 when no request body.
     $response = $this->request('POST', $url, $request_options);
     $this->assertResourceErrorResponse(400, 'Empty request body.', $url, $response, FALSE);
@@ -1866,6 +1860,13 @@ abstract class ResourceTestBase extends BrowserTestBase {
     $this->assertResourceErrorResponse(400, 'Resource object must include a "type".', $url, $response, FALSE);
 
     $request_options[RequestOptions::BODY] = $parseable_invalid_request_body;
+
+    // DX: 403 when unauthorized.
+    $response = $this->request('POST', $url, $request_options);
+    $reason = $this->getExpectedUnauthorizedAccessMessage('POST');
+    $this->assertResourceErrorResponse(403, (string) $reason, $url, $response);
+
+    $this->setUpAuthorization('POST');
 
     // DX: 422 when invalid entity: multiple values sent for single-value field.
     $response = $this->request('POST', $url, $request_options);
@@ -2083,13 +2084,6 @@ abstract class ResourceTestBase extends BrowserTestBase {
 
     $request_options[RequestOptions::HEADERS]['Content-Type'] = 'application/vnd.api+json';
 
-    // DX: 403 when unauthorized.
-    $response = $this->request('PATCH', $url, $request_options);
-    $reason = $this->getExpectedUnauthorizedAccessMessage('PATCH');
-    $this->assertResourceErrorResponse(403, (string) $reason, $url, $response, FALSE);
-
-    $this->setUpAuthorization('PATCH');
-
     // DX: 400 when no request body.
     $response = $this->request('PATCH', $url, $request_options);
     $this->assertResourceErrorResponse(400, 'Empty request body.', $url, $response, FALSE);
@@ -2101,6 +2095,13 @@ abstract class ResourceTestBase extends BrowserTestBase {
     $this->assertResourceErrorResponse(400, 'Syntax error', $url, $response, FALSE);
 
     $request_options[RequestOptions::BODY] = $parseable_invalid_request_body;
+
+    // DX: 403 when unauthorized.
+    $response = $this->request('PATCH', $url, $request_options);
+    $reason = $this->getExpectedUnauthorizedAccessMessage('PATCH');
+    $this->assertResourceErrorResponse(403, (string) $reason, $url, $response);
+
+    $this->setUpAuthorization('PATCH');
 
     // DX: 422 when invalid entity: multiple values sent for single-value field.
     $response = $this->request('PATCH', $url, $request_options);

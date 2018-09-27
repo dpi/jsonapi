@@ -4,7 +4,6 @@ parameters:
 services:
   jsonapi.serializer_do_not_use_removal_imminent:
     class: Drupal\jsonapi\Serializer\Serializer
-    public: false
     calls:
       - [setFallbackNormalizer, ['@serializer']]
     arguments: [{  }, {  }]
@@ -104,7 +103,8 @@ services:
       - { name: route_enhancer }
   jsonapi.params.enhancer:
     class: Drupal\jsonapi\Routing\JsonApiParamEnhancer
-    arguments: ['@serializer.normalizer.filter.jsonapi', '@serializer.normalizer.sort.jsonapi', '@serializer.normalizer.offset_page.jsonapi']
+    calls:
+      - [setContainer, ['@service_container']]
     tags:
       - { name: route_enhancer }
   jsonapi.link_manager:
@@ -145,7 +145,6 @@ services:
   jsonapi.request_handler:
     class: \Drupal\jsonapi\Controller\RequestHandler
     arguments:
-      - '@jsonapi.serializer_do_not_use_removal_imminent'
       - '@jsonapi.entity_resource'
   jsonapi.entity_resource:
     class: \Drupal\jsonapi\Controller\EntityResource
