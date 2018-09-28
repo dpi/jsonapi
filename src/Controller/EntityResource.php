@@ -124,8 +124,6 @@ class EntityResource {
   /**
    * Gets the individual entity.
    *
-   * @param \Drupal\jsonapi\ResourceType\ResourceType $resource_type
-   *   The base JSON API resource type for the request to be served.
    * @param \Drupal\Core\Entity\EntityInterface $entity
    *   The loaded entity.
    * @param \Symfony\Component\HttpFoundation\Request $request
@@ -137,7 +135,7 @@ class EntityResource {
    * @throws \Drupal\jsonapi\Exception\EntityAccessDeniedHttpException
    *   Thrown when access to the entity is not allowed.
    */
-  public function getIndividual(ResourceType $resource_type, EntityInterface $entity, Request $request) {
+  public function getIndividual(EntityInterface $entity, Request $request) {
     $entity = static::getAccessCheckedEntity($entity);
     if ($entity instanceof EntityAccessDeniedHttpException) {
       throw $entity;
@@ -309,17 +307,13 @@ class EntityResource {
   /**
    * Deletes an individual entity.
    *
-   * @param \Drupal\jsonapi\ResourceType\ResourceType $resource_type
-   *   The base JSON API resource type for the request to be served.
    * @param \Drupal\Core\Entity\EntityInterface $entity
    *   The loaded entity.
-   * @param \Symfony\Component\HttpFoundation\Request $request
-   *   The request object.
    *
    * @return \Drupal\jsonapi\ResourceResponse
    *   The response.
    */
-  public function deleteIndividual(ResourceType $resource_type, EntityInterface $entity, Request $request) {
+  public function deleteIndividual(EntityInterface $entity) {
     $entity->delete();
     return new ResourceResponse(NULL, 204);
   }

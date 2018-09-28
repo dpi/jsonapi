@@ -195,8 +195,7 @@ class EntityResourceTest extends JsonapiKernelTestBase {
    * @covers ::getIndividual
    */
   public function testGetIndividual() {
-    $resource_type = new ResourceType('node', 'article', NULL);
-    $response = $this->entityResource->getIndividual($resource_type, $this->node, new Request());
+    $response = $this->entityResource->getIndividual($this->node, new Request());
     $this->assertInstanceOf(JsonApiDocumentTopLevel::class, $response->getResponseData());
     $this->assertEquals(1, $response->getResponseData()->getData()->id());
   }
@@ -205,12 +204,11 @@ class EntityResourceTest extends JsonapiKernelTestBase {
    * @covers ::getIndividual
    */
   public function testGetIndividualDenied() {
-    $resource_type = new ResourceType('node', 'article', NULL);
     $role = Role::load(RoleInterface::ANONYMOUS_ID);
     $role->revokePermission('access content');
     $role->save();
     $this->setExpectedException(EntityAccessDeniedHttpException::class);
-    $this->entityResource->getIndividual($resource_type, $this->node, new Request());
+    $this->entityResource->getIndividual($this->node, new Request());
   }
 
   /**
@@ -565,8 +563,7 @@ class EntityResourceTest extends JsonapiKernelTestBase {
     Role::load(Role::ANONYMOUS_ID)
       ->grantPermission('delete own article content')
       ->save();
-    $resource_type = new ResourceType('node', 'article', NULL);
-    $response = $this->entityResource->deleteIndividual($resource_type, $node, new Request());
+    $response = $this->entityResource->deleteIndividual($node);
     // As a side effect, the node will also be deleted.
     $count = $this->container->get('entity_type.manager')
       ->getStorage('node')
