@@ -141,14 +141,9 @@ services:
     parent: logger.channel_base
     arguments: ['jsonapi']
 
-  # Controllers.
-  jsonapi.request_handler:
-    class: \Drupal\jsonapi\Controller\RequestHandler
-    arguments:
-      - '@jsonapi.entity_resource'
+  # Controller.
   jsonapi.entity_resource:
     class: \Drupal\jsonapi\Controller\EntityResource
-    public: false
     arguments:
       - '@entity_type.manager'
       - '@entity_field.manager'

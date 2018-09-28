@@ -749,7 +749,7 @@ class JsonApiFunctionalTest extends JsonApiFunctionalTestBase {
         ],
       ],
     ];
-    $relationship_url = Url::fromRoute('jsonapi.node--article.field_tags.relationship', [
+    $relationship_url = Url::fromRoute('jsonapi.node--article.field_tags.relationship.post', [
       'entity' => $uuid,
     ]);
     $response = $this->request('POST', $relationship_url, [

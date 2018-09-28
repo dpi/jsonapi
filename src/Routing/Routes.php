@@ -23,13 +23,13 @@ use Symfony\Component\Routing\RouteCollection;
 class Routes implements ContainerInjectionInterface {
 
   /**
-   * The front controller for the JSON API routes.
+   * The service name for the primary JSON API controller.
    *
-   * All routes will use this callback to bootstrap the JSON API process.
+   * All resources except the entrypoint are served by this controller.
    *
    * @var string
    */
-  const FRONT_CONTROLLER = 'jsonapi.request_handler:handle';
+  const CONTROLLER_SERVICE_NAME = 'jsonapi.entity_resource';
 
   /**
    * A key with which to flag a route as belonging to the JSON API module.
@@ -151,6 +151,7 @@ class Routes implements ContainerInjectionInterface {
     // Collection route like `/jsonapi/node/article`.
     if ($resource_type->isLocatable()) {
       $collection_route = new Route("/{$resource_type->getPath()}");
+      $collection_route->addDefaults([RouteObjectInterface::CONTROLLER_NAME => static::CONTROLLER_SERVICE_NAME . ':getCollection']);
       $collection_route->setMethods(['GET']);
       // Allow anybody access because "view" and "view label" access are checked
       // in the controller.
@@ -161,6 +162,7 @@ class Routes implements ContainerInjectionInterface {
     // Creation route.
     if ($resource_type->isMutable()) {
       $collection_create_route = new Route("/{$resource_type->getPath()}");
+      $collection_create_route->addDefaults([RouteObjectInterface::CONTROLLER_NAME => static::CONTROLLER_SERVICE_NAME . ':createIndividual']);
       $collection_create_route->setMethods(['POST']);
       $collection_create_route->addDefaults(['serialization_class' => JsonApiDocumentTopLevel::class]);
       $create_requirement = sprintf("%s:%s", $resource_type->getEntityTypeId(), $resource_type->getBundle());
@@ -179,8 +181,7 @@ class Routes implements ContainerInjectionInterface {
       $route->addDefaults([static::RESOURCE_TYPE_KEY => $resource_type->getTypeName()]);
     }
 
-    // Resource routes all have the same controller.
-    $routes->addDefaults([RouteObjectInterface::CONTROLLER_NAME => static::FRONT_CONTROLLER]);
+    // Resource routes all have the same base path.
     $routes->addPrefix($path_prefix);
 
     return $routes;
@@ -197,7 +198,7 @@ class Routes implements ContainerInjectionInterface {
    */
   public static function isJsonApiRequest(array $defaults) {
     return isset($defaults[RouteObjectInterface::CONTROLLER_NAME])
-      && $defaults[RouteObjectInterface::CONTROLLER_NAME] === static::FRONT_CONTROLLER;
+      && strpos($defaults[RouteObjectInterface::CONTROLLER_NAME], static::CONTROLLER_SERVICE_NAME) === 0;
   }
 
   /**
@@ -221,6 +222,7 @@ class Routes implements ContainerInjectionInterface {
 
     // Individual read, update and remove.
     $individual_route = new Route("/{$path}/{entity}");
+    $individual_route->addDefaults([RouteObjectInterface::CONTROLLER_NAME => static::CONTROLLER_SERVICE_NAME . ':getIndividual']);
     $individual_route->setMethods(['GET']);
     // No _entity_access requirement because "view" and "view label" access are
     // checked in the controller. So it's safe to allow anybody access.
@@ -228,12 +230,14 @@ class Routes implements ContainerInjectionInterface {
     $routes->add(static::getRouteName($resource_type, 'individual'), $individual_route);
     if ($resource_type->isMutable()) {
       $individual_update_route = new Route($individual_route->getPath());
+      $individual_update_route->addDefaults([RouteObjectInterface::CONTROLLER_NAME => static::CONTROLLER_SERVICE_NAME . ':patchIndividual']);
       $individual_update_route->setMethods(['PATCH']);
       $individual_update_route->addDefaults(['serialization_class' => JsonApiDocumentTopLevel::class]);
       $individual_update_route->setRequirement('_entity_access', "entity.update");
       $individual_update_route->setRequirement('_csrf_request_header_token', 'TRUE');
       $routes->add(static::getRouteName($resource_type, 'individual.patch'), $individual_update_route);
       $individual_remove_route = new Route($individual_route->getPath());
+      $individual_remove_route->addDefaults([RouteObjectInterface::CONTROLLER_NAME => static::CONTROLLER_SERVICE_NAME . ':deleteIndividual']);
       $individual_remove_route->setMethods(['DELETE']);
       $individual_remove_route->setRequirement('_entity_access', "entity.delete");
       $individual_remove_route->setRequirement('_csrf_request_header_token', 'TRUE');
@@ -244,16 +248,26 @@ class Routes implements ContainerInjectionInterface {
       // Read, update, add, or remove an individual resources relationships to
       // other resources.
       $relationship_route = new Route("/{$path}/{entity}/relationships/{$relationship_field_name}");
-      $relationship_route->setMethods($resource_type->isMutable()
-        ? ['GET', 'POST', 'PATCH', 'DELETE']
-        : ['GET']
-      );
       $relationship_route->addDefaults(['_on_relationship' => TRUE]);
       $relationship_route->addDefaults(['serialization_class' => Relationship::class]);
       $relationship_route->addDefaults(['related' => $relationship_field_name]);
       $relationship_route->setRequirement(RelationshipFieldAccess::ROUTE_REQUIREMENT_KEY, $relationship_field_name);
       $relationship_route->setRequirement('_csrf_request_header_token', 'TRUE');
-      $routes->add(static::getRouteName($resource_type, "$relationship_field_name.relationship"), $relationship_route);
+      $relationship_route_methods = $resource_type->isMutable()
+        ? ['GET', 'POST', 'PATCH', 'DELETE']
+        : ['GET'];
+      $relationship_controller_methods = [
+        'GET' => 'getRelationship',
+        'POST' => 'addToRelationshipData',
+        'PATCH' => 'replaceRelationshipData',
+        'DELETE' => 'removeFromRelationshipData',
+      ];
+      foreach ($relationship_route_methods as $method) {
+        $method_specific_relationship_route = clone $relationship_route;
+        $method_specific_relationship_route->addDefaults([RouteObjectInterface::CONTROLLER_NAME => static::CONTROLLER_SERVICE_NAME . ":{$relationship_controller_methods[$method]}"]);
+        $method_specific_relationship_route->setMethods($method);
+        $routes->add(static::getRouteName($resource_type, sprintf("%s.relationship.%s", $relationship_field_name, strtolower($method))), $method_specific_relationship_route);
+      }
 
       // Only create routes for related routes that target at least one
       // non-internal resource type.
@@ -261,6 +275,7 @@ class Routes implements ContainerInjectionInterface {
         // Get an individual resource's related resources.
         $related_route = new Route("/{$path}/{entity}/{$relationship_field_name}");
         $related_route->setMethods(['GET']);
+        $related_route->addDefaults([RouteObjectInterface::CONTROLLER_NAME => static::CONTROLLER_SERVICE_NAME . ':getRelated']);
         $related_route->addDefaults(['related' => $relationship_field_name]);
         $related_route->setRequirement(RelationshipFieldAccess::ROUTE_REQUIREMENT_KEY, $relationship_field_name);
         $routes->add(static::getRouteName($resource_type, "$relationship_field_name.related"), $related_route);

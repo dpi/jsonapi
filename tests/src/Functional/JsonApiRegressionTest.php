@@ -159,7 +159,7 @@ class JsonApiRegressionTest extends JsonApiFunctionalTestBase {
 
     // Test.
     $user = $this->drupalCreateUser(['bypass node access']);
-    $url = Url::fromRoute('jsonapi.node--page.field_test.relationship', ['entity' => $node->uuid()]);
+    $url = Url::fromRoute('jsonapi.node--page.field_test.relationship.post', ['entity' => $node->uuid()]);
     $request_options = [
       RequestOptions::HEADERS => [
         'Content-Type' => 'application/vnd.api+json',

@@ -77,7 +77,8 @@ class JsonApiParamEnhancer implements EnhancerInterface, ContainerAwareInterface
     if (isset($defaults['serialization_class']) && !$request->isMethodSafe(FALSE)) {
       // Deserialize incoming data if available.
       if ($received = (string) $request->getContent()) {
-        $defaults['deserialized'] = $this->deserialize($resource_type, $received, $defaults);
+        $deserialized_param_name = empty($defaults['related']) ? 'parsed_entity' : 'resource_identifiers';
+        $defaults[$deserialized_param_name] = $this->deserialize($resource_type, $received, $defaults);
       }
       elseif ($request->isMethod('POST') || $request->isMethod('PATCH')) {
         throw new BadRequestHttpException('Empty request body.');

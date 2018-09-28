@@ -157,7 +157,7 @@ class RelationshipNormalizerValue extends FieldNormalizerValue {
       $this->hostEntityId,
       $this->resourceType,
       $route_parameters,
-      "$relationship_field_name.relationship"
+      "$relationship_field_name.relationship.get"
     );
     $resource_types = $this->resourceType->getRelatableResourceTypesByField($field_name);
     if (static::hasNonInternalResourceType($resource_types)) {

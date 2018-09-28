@@ -1371,7 +1371,7 @@ abstract class ResourceTestBase extends BrowserTestBase {
     /* @var \Drupal\Core\Access\AccessResultReasonInterface $update_access */
     $update_access = static::entityAccess($resource, 'update', $this->account)
       ->andIf(static::entityFieldAccess($resource, $relationship_field_name, 'edit', $this->account));
-    $url = Url::fromRoute(sprintf("jsonapi.{$resource_identifier['type']}.{$relationship_field_name}.relationship"), [
+    $url = Url::fromRoute(sprintf("jsonapi.{$resource_identifier['type']}.{$relationship_field_name}.relationship.patch"), [
       'entity' => $resource->uuid(),
     ]);
 
@@ -1607,7 +1607,7 @@ abstract class ResourceTestBase extends BrowserTestBase {
     $access = static::entityFieldAccess($entity, $this->resourceType->getInternalName($relationship_field_name), 'view', $this->account);
     if (!$access->isAllowed()) {
       $via_link = Url::fromRoute(
-        sprintf('jsonapi.%s.%s.relationship', static::$resourceTypeName, $relationship_field_name),
+        sprintf('jsonapi.%s.%s.relationship.get', static::$resourceTypeName, $relationship_field_name),
         ['entity' => $entity->uuid()]
       );
       return static::getAccessDeniedResponse($this->entity, $access, $via_link, $relationship_field_name, 'The current user is not allowed to view this relationship.', FALSE);

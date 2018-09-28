@@ -40,7 +40,6 @@ use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 /**
  * Process all entity requests.
  *
- * @see \Drupal\jsonapi\Controller\RequestHandler
  * @internal
  */
 class EntityResource {
@@ -197,7 +196,7 @@ class EntityResource {
    *
    * @param \Drupal\jsonapi\ResourceType\ResourceType $resource_type
    *   The JSON API resource type for the request to be served.
-   * @param \Drupal\Core\Entity\EntityInterface $entity
+   * @param \Drupal\Core\Entity\EntityInterface $parsed_entity
    *   The loaded entity.
    * @param \Symfony\Component\HttpFoundation\Request $request
    *   The request object.
@@ -208,8 +207,8 @@ class EntityResource {
    * @throws \Symfony\Component\HttpKernel\Exception\ConflictHttpException
    *   Thrown when the entity already exists.
    */
-  public function createIndividual(ResourceType $resource_type, EntityInterface $entity, Request $request) {
-    if ($entity instanceof FieldableEntityInterface) {
+  public function createIndividual(ResourceType $resource_type, EntityInterface $parsed_entity, Request $request) {
+    if ($parsed_entity instanceof FieldableEntityInterface) {
       // Only check 'edit' permissions for fields that were actually submitted
       // by the user. Field access makes no distinction between 'create' and
       // 'update', so the 'edit' operation is used here.
@@ -218,7 +217,7 @@ class EntityResource {
         $received_attributes = array_keys($document['data']['attributes']);
         foreach ($received_attributes as $field_name) {
           $internal_field_name = $resource_type->getInternalName($field_name);
-          $field_access = $entity->get($internal_field_name)
+          $field_access = $parsed_entity->get($internal_field_name)
             ->access('edit', NULL, TRUE);
           if (!$field_access->isAllowed()) {
             throw new EntityAccessDeniedHttpException(NULL, $field_access, '/data/attributes/' . $field_name, sprintf('The current user is not allowed to POST the selected field (%s).', $field_name));
@@ -229,7 +228,7 @@ class EntityResource {
         $received_relationships = array_keys($document['data']['relationships']);
         foreach ($received_relationships as $field_name) {
           $internal_field_name = $resource_type->getInternalName($field_name);
-          $field_access = $entity->get($internal_field_name)->access('edit', NULL, TRUE);
+          $field_access = $parsed_entity->get($internal_field_name)->access('edit', NULL, TRUE);
           if (!$field_access->isAllowed()) {
             throw new EntityAccessDeniedHttpException(NULL, $field_access, '/data/relationships/' . $field_name, sprintf('The current user is not allowed to POST the selected field (%s).', $field_name));
           }
@@ -237,23 +236,23 @@ class EntityResource {
       }
     }
 
-    $this->validate($entity);
+    $this->validate($parsed_entity);
 
     // Return a 409 Conflict response in accordance with the JSON API spec. See
     // http://jsonapi.org/format/#crud-creating-responses-409.
-    if ($this->entityExists($entity)) {
+    if ($this->entityExists($parsed_entity)) {
       throw new ConflictHttpException('Conflict: Entity already exists.');
     }
 
-    $entity->save();
+    $parsed_entity->save();
 
     // Build response object.
-    $response = $this->buildWrappedResponse($entity, $request, new NullEntityCollection(), 201);
+    $response = $this->buildWrappedResponse($parsed_entity, $request, new NullEntityCollection(), 201);
 
     // According to JSON API specification, when a new entity was created
     // we should send "Location" header to the frontend.
     $entity_url = $this->linkManager->getEntityLink(
-      $entity->uuid(),
+      $parsed_entity->uuid(),
       $resource_type,
       [],
       'individual'
@@ -414,7 +413,7 @@ class EntityResource {
    *   The JSON API resource type for the request to be served.
    * @param \Drupal\Core\Entity\FieldableEntityInterface $entity
    *   The requested entity.
-   * @param string $related_field
+   * @param string $related
    *   The related field name.
    * @param \Symfony\Component\HttpFoundation\Request $request
    *   The request object.
@@ -422,9 +421,9 @@ class EntityResource {
    * @return \Drupal\jsonapi\ResourceResponse
    *   The response.
    */
-  public function getRelated(ResourceType $resource_type, FieldableEntityInterface $entity, $related_field, Request $request) {
+  public function getRelated(ResourceType $resource_type, FieldableEntityInterface $entity, $related, Request $request) {
     /* @var \Drupal\Core\Field\EntityReferenceFieldItemListInterface $field_list */
-    $field_list = $entity->get($resource_type->getInternalName($related_field));
+    $field_list = $entity->get($resource_type->getInternalName($related));
 
     // Remove the entities pointing to a resource that may be disabled. Even
     // though the normalizer skips disabled references, we can avoid unnecessary
@@ -444,7 +443,7 @@ class EntityResource {
       $collection_data[] = static::getAccessCheckedEntity($referenced_entity);
     }
     $entity_collection = new EntityCollection($collection_data, $field_list->getFieldDefinition()->getFieldStorageDefinition()->getCardinality());
-    $response = $this->buildWrappedResponse($entity_collection, $request, $this->getIncludes($request, $entity_collection, $related_field));
+    $response = $this->buildWrappedResponse($entity_collection, $request, $this->getIncludes($request, $entity_collection, $related));
 
     // $response does not contain the entity list cache tag. We add the
     // cacheable metadata for the finite list of entities in the relationship.
@@ -460,7 +459,7 @@ class EntityResource {
    *   The base JSON API resource type for the request to be served.
    * @param \Drupal\Core\Entity\FieldableEntityInterface $entity
    *   The requested entity.
-   * @param string $related_field
+   * @param string $related
    *   The related field name.
    * @param \Symfony\Component\HttpFoundation\Request $request
    *   The request object.
@@ -470,9 +469,9 @@ class EntityResource {
    * @return \Drupal\jsonapi\ResourceResponse
    *   The response.
    */
-  public function getRelationship(ResourceType $resource_type, FieldableEntityInterface $entity, $related_field, Request $request, $response_code = 200) {
+  public function getRelationship(ResourceType $resource_type, FieldableEntityInterface $entity, $related, Request $request, $response_code = 200) {
     /* @var \Drupal\Core\Field\EntityReferenceFieldItemListInterface $field_list */
-    $field_list = $entity->get($resource_type->getInternalName($related_field));
+    $field_list = $entity->get($resource_type->getInternalName($related));
     $response = $this->buildWrappedResponse($field_list, $request, $this->getIncludes($request, $entity), $response_code);
     // Add the host entity as a cacheable dependency.
     $response->addCacheableDependency($entity);
@@ -486,7 +485,7 @@ class EntityResource {
    *   The base JSON API resource type for the request to be served.
    * @param \Drupal\Core\Entity\FieldableEntityInterface $entity
    *   The requested entity.
-   * @param string $related_field
+   * @param string $related
    *   The related field name.
    * @param \Drupal\jsonapi\JsonApiResource\ResourceIdentifier[] $resource_identifiers
    *   The received resource identifiers.
@@ -504,17 +503,17 @@ class EntityResource {
    * @throws \Drupal\Core\Entity\EntityStorageException
    *   Thrown when the underlying entity cannot be saved.
    */
-  public function addToRelationshipData(ResourceType $resource_type, FieldableEntityInterface $entity, $related_field, array $resource_identifiers, Request $request) {
-    $related_field = $resource_type->getInternalName($related_field);
+  public function addToRelationshipData(ResourceType $resource_type, FieldableEntityInterface $entity, $related, array $resource_identifiers, Request $request) {
+    $related = $resource_type->getInternalName($related);
     // According to the specification, you are only allowed to POST to a
     // relationship if it is a to-many relationship.
     /* @var \Drupal\Core\Field\EntityReferenceFieldItemListInterface $field_list */
-    $field_list = $entity->{$related_field};
+    $field_list = $entity->{$related};
     /* @var \Drupal\field\Entity\FieldConfig $field_definition */
     $field_definition = $field_list->getFieldDefinition();
     $is_multiple = $field_definition->getFieldStorageDefinition()->isMultiple();
     if (!$is_multiple) {
-      throw new ConflictHttpException(sprintf('You can only POST to to-many relationships. %s is a to-one relationship.', $related_field));
+      throw new ConflictHttpException(sprintf('You can only POST to to-many relationships. %s is a to-one relationship.', $related));
     }
 
     $original_resource_identifiers = ResourceIdentifier::toResourceIdentifiers($field_list);
@@ -527,7 +526,7 @@ class EntityResource {
     // There are no relationships that need to be added so we can exit early.
     if (empty($new_resource_identifiers)) {
       $status = static::relationshipResponseRequiresBody($resource_identifiers, $original_resource_identifiers) ? 200 : 204;
-      return $this->getRelationship($resource_type, $entity, $related_field, $request, $status);
+      return $this->getRelationship($resource_type, $entity, $related, $request, $status);
     }
 
     $main_property_name = $field_definition->getItemDefinition()->getMainPropertyName();
@@ -544,7 +543,7 @@ class EntityResource {
 
     $final_resource_identifiers = ResourceIdentifier::toResourceIdentifiers($field_list);
     $status = static::relationshipResponseRequiresBody($resource_identifiers, $final_resource_identifiers) ? 200 : 204;
-    return $this->getRelationship($resource_type, $entity, $related_field, $request, $status);
+    return $this->getRelationship($resource_type, $entity, $related, $request, $status);
   }
 
   /**
@@ -554,7 +553,7 @@ class EntityResource {
    *   The base JSON API resource type for the request to be served.
    * @param \Drupal\Core\Entity\EntityInterface $entity
    *   The requested entity.
-   * @param string $related_field
+   * @param string $related
    *   The related field name.
    * @param \Drupal\jsonapi\JsonApiResource\ResourceIdentifier[] $resource_identifiers
    *   The client-sent resource identifiers which should be set on the given
@@ -568,13 +567,13 @@ class EntityResource {
    * @throws \Drupal\Core\Entity\EntityStorageException
    *   Thrown when the underlying entity cannot be saved.
    */
-  public function replaceRelationshipData(ResourceType $resource_type, EntityInterface $entity, $related_field, array $resource_identifiers, Request $request) {
-    $related_field = $resource_type->getInternalName($related_field);
+  public function replaceRelationshipData(ResourceType $resource_type, EntityInterface $entity, $related, array $resource_identifiers, Request $request) {
+    $related = $resource_type->getInternalName($related);
     /* @var \Drupal\Core\Field\EntityReferenceFieldItemListInterface $resource_identifiers */
     // According to the specification, PATCH works a little bit different if the
     // relationship is to-one or to-many.
     /* @var \Drupal\Core\Field\EntityReferenceFieldItemListInterface $field_list */
-    $field_list = $entity->{$related_field};
+    $field_list = $entity->{$related};
     $field_definition = $field_list->getFieldDefinition();
     $is_multiple = $field_definition->getFieldStorageDefinition()->isMultiple();
     $method = $is_multiple ? 'doPatchMultipleRelationship' : 'doPatchIndividualRelationship';
@@ -582,7 +581,7 @@ class EntityResource {
     $this->validate($entity);
     $entity->save();
     $requires_response = static::relationshipResponseRequiresBody($resource_identifiers, ResourceIdentifier::toResourceIdentifiers($field_list));
-    return $this->getRelationship($resource_type, $entity, $related_field, $request, $requires_response ? 200 : 204);
+    return $this->getRelationship($resource_type, $entity, $related, $request, $requires_response ? 200 : 204);
   }
 
   /**
@@ -635,7 +634,7 @@ class EntityResource {
    *   The base JSON API resource type for the request to be served.
    * @param \Drupal\Core\Entity\EntityInterface $entity
    *   The requested entity.
-   * @param string $related_field
+   * @param string $related
    *   The related field name.
    * @param \Drupal\jsonapi\JsonApiResource\ResourceIdentifier[]|\Symfony\Component\HttpFoundation\Request $resource_identifiers
    *   The client-sent resource identifiers which should be removed from the
@@ -652,21 +651,19 @@ class EntityResource {
    *   Thrown when deleting a "to-one" relationship.
    * @throws \Drupal\Core\Entity\EntityStorageException
    *   Thrown when the underlying entity cannot be saved.
-   *
-   * @todo: add `array` type hint to $resource_identifiers in https://www.drupal.org/project/jsonapi/issues/2987610
    */
-  public function removeFromRelationshipData(ResourceType $resource_type, EntityInterface $entity, $related_field, $resource_identifiers, Request $request) {
+  public function removeFromRelationshipData(ResourceType $resource_type, EntityInterface $entity, $related, array $resource_identifiers, Request $request) {
     if ($resource_identifiers instanceof Request) {
       // This usually means that there was not body provided.
-      throw new BadRequestHttpException(sprintf('You need to provide a body for DELETE operations on a relationship (%s).', $related_field));
+      throw new BadRequestHttpException(sprintf('You need to provide a body for DELETE operations on a relationship (%s).', $related));
     }
     /* @var \Drupal\Core\Field\EntityReferenceFieldItemListInterface $field_list */
-    $field_list = $entity->{$related_field};
+    $field_list = $entity->{$related};
     $is_multiple = $field_list->getFieldDefinition()
       ->getFieldStorageDefinition()
       ->isMultiple();
     if (!$is_multiple) {
-      throw new ConflictHttpException(sprintf('You can only DELETE from to-many relationships. %s is a to-one relationship.', $related_field));
+      throw new ConflictHttpException(sprintf('You can only DELETE from to-many relationships. %s is a to-one relationship.', $related));
     }
 
     // Compute the list of current values and remove the ones in the payload.
@@ -692,7 +689,7 @@ class EntityResource {
     // Save the entity and return the response object.
     $this->validate($entity);
     $entity->save();
-    return $this->getRelationship($resource_type, $entity, $related_field, $request, 204);
+    return $this->getRelationship($resource_type, $entity, $related, $request, 204);
   }
 
   /**
@@ -918,7 +915,7 @@ class EntityResource {
    *   The request object.
    * @param \Drupal\Core\Entity\EntityInterface|\Drupal\jsonapi\JsonApiResource\EntityCollection $data
    *   The response data from which to resolve includes.
-   * @param string $related_field
+   * @param string $related
    *   (optional) The relationship field name to be given for getting includes
    *   on a related route.
    *
@@ -929,9 +926,9 @@ class EntityResource {
    * @throws \Drupal\Component\Plugin\Exception\InvalidPluginDefinitionException
    * @throws \Drupal\Component\Plugin\Exception\PluginNotFoundException
    */
-  public function getIncludes(Request $request, $data, $related_field = NULL) {
+  public function getIncludes(Request $request, $data, $related = NULL) {
     return $request->query->has('include') && ($include_parameter = $request->query->get('include')) && !empty($include_parameter)
-      ? $this->includeResolver->resolve($request->get(Routes::RESOURCE_TYPE_KEY), $data, $include_parameter, $related_field)
+      ? $this->includeResolver->resolve($request->get(Routes::RESOURCE_TYPE_KEY), $data, $include_parameter, $related)
       : new NullEntityCollection();
   }
 
