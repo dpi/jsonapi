@@ -36,15 +36,21 @@ class EntityAccessDeniedHttpExceptionNormalizer extends HttpExceptionNormalizer 
       $entity = $error['entity'];
       $pointer = $error['pointer'];
       $reason = $error['reason'];
+      $relationship_field = isset($error['relationship_field'])
+        ? $error['relationship_field']
+        : NULL;
 
       if (isset($entity)) {
         $entity_type_id = $entity->getEntityTypeId();
         $bundle = $entity->bundle();
-        $url = Url::fromRoute(
-          sprintf('jsonapi.%s.individual', \Drupal::service('jsonapi.resource_type.repository')->get($entity_type_id, $bundle)->getTypeName()),
-          ['entity' => $entity->uuid()]
-        )->setAbsolute()->toString(TRUE);
-        $errors[0]['links']['via']['href'] = $url->getGeneratedUrl();
+        /* @var \Drupal\jsonapi\ResourceType\ResourceType $resource_type */
+        $resource_type = \Drupal::service('jsonapi.resource_type.repository')->get($entity_type_id, $bundle);
+        $resource_type_name = $resource_type->getTypeName();
+        $route_name = !is_null($relationship_field)
+          ? "jsonapi.$resource_type_name.$relationship_field.related"
+          : "jsonapi.$resource_type_name.individual";
+        $url = Url::fromRoute($route_name, ['entity' => $entity->uuid()]);
+        $errors[0]['links']['via']['href'] = $url->setAbsolute()->toString(TRUE)->getGeneratedUrl();
       }
       $errors[0]['source']['pointer'] = $pointer;
 

@@ -6,6 +6,7 @@ use Behat\Mink\Driver\BrowserKitDriver;
 use Drupal\Component\Serialization\Json;
 use Drupal\Component\Utility\NestedArray;
 use Drupal\Component\Utility\Random;
+use Drupal\Core\Access\AccessResultReasonInterface;
 use Drupal\Core\Cache\Cache;
 use Drupal\Core\Cache\CacheableMetadata;
 use Drupal\Core\Cache\CacheableResponseInterface;
@@ -1131,11 +1132,7 @@ abstract class ResourceTestBase extends BrowserTestBase {
     $include = ['include' => implode(',', $relationship_field_names)];
     $filtered_collection_include_url = clone $collection_url;
     $filtered_collection_include_url->setOption('query', array_merge($entity_collection_filter, $include));
-    $expected_response = $this->getExpectedCollectionResponse($filtered_entity_collection, $filtered_collection_include_url->toString(), $request_options);
-    $related_responses = array_reduce($filtered_entity_collection, function ($related_responses, $entity) use ($relationship_field_names, $request_options) {
-      return array_merge($related_responses, array_values($this->getExpectedRelatedResponses($relationship_field_names, $request_options, $entity)));
-    }, []);
-    $expected_response = static::decorateExpectedResponseForIncludedFields($expected_response, $related_responses);
+    $expected_response = $this->getExpectedCollectionResponse($filtered_entity_collection, $filtered_collection_include_url->toString(), $request_options, $relationship_field_names);
     $expected_cacheability = $expected_response->getCacheableMetadata();
     $expected_cacheability->setCacheTags(array_values(array_diff($expected_cacheability->getCacheTags(), ['4xx-response'])));
     $expected_document = $expected_response->getResponseData();
@@ -1143,6 +1140,27 @@ abstract class ResourceTestBase extends BrowserTestBase {
     // MISS or UNCACHEABLE depends on the included data. It must not be HIT.
     $dynamic_cache = $expected_cacheability->getCacheMaxAge() === 0 ? 'UNCACHEABLE' : 'MISS';
     $this->assertResourceResponse(200, $expected_document, $response, $expected_cacheability->getCacheTags(), $expected_cacheability->getCacheContexts(), FALSE, $dynamic_cache);
+
+    // If the response should vary by a user's authorizations, grant permissions
+    // for the included resources and execute another request.
+    $permission_related_cache_contexts = [
+      'user',
+      'user.permissions',
+      'user.roles',
+    ];
+    if (!empty($relationship_field_names) && !empty(array_intersect($expected_cacheability->getCacheContexts(), $permission_related_cache_contexts))) {
+      $applicable_permissions = array_intersect_key(static::getIncludePermissions(), array_flip($relationship_field_names));
+      $flattened_permissions = array_unique(array_reduce($applicable_permissions, 'array_merge', []));
+      $this->grantPermissionsToTestedRole($flattened_permissions);
+      $expected_response = $this->getExpectedCollectionResponse($filtered_entity_collection, $filtered_collection_include_url->toString(), $request_options, $relationship_field_names);
+      $expected_cacheability = $expected_response->getCacheableMetadata();
+      $expected_document = $expected_response->getResponseData();
+      $response = $this->request('GET', $filtered_collection_include_url, $request_options);
+      $requires_include_only_permissions = !empty($flattened_permissions);
+      $cacheable = $expected_cacheability->getCacheMaxAge() !== 0;
+      $dynamic_cache = $cacheable ? $requires_include_only_permissions ? 'MISS' : 'HIT' : 'UNCACHEABLE';
+      $this->assertResourceResponse(200, $expected_document, $response, $expected_cacheability->getCacheTags(), $expected_cacheability->getCacheContexts(), FALSE, $dynamic_cache);
+    }
 
     // Sorted collection with includes.
     $sorted_entity_collection = $entity_collection;
@@ -1157,11 +1175,7 @@ abstract class ResourceTestBase extends BrowserTestBase {
     }
     $sorted_collection_include_url = clone $collection_url;
     $sorted_collection_include_url->setOption('query', array_merge($include, ['sort' => "-{$id_key}"]));
-    $expected_response = $this->getExpectedCollectionResponse($sorted_entity_collection, $sorted_collection_include_url->toString(), $request_options);
-    $related_responses = array_reduce($sorted_entity_collection, function ($related_responses, $entity) use ($relationship_field_names, $request_options) {
-      return array_merge($related_responses, array_values($this->getExpectedRelatedResponses($relationship_field_names, $request_options, $entity)));
-    }, []);
-    $expected_response = static::decorateExpectedResponseForIncludedFields($expected_response, $related_responses);
+    $expected_response = $this->getExpectedCollectionResponse($sorted_entity_collection, $sorted_collection_include_url->toString(), $request_options, $relationship_field_names);
     $expected_cacheability = $expected_response->getCacheableMetadata();
     $expected_cacheability->setCacheTags(array_values(array_diff($expected_cacheability->getCacheTags(), ['4xx-response'])));
     $expected_document = $expected_response->getResponseData();
@@ -1180,13 +1194,16 @@ abstract class ResourceTestBase extends BrowserTestBase {
    *   The self link for the collection response document.
    * @param array $request_options
    *   Request options to apply.
+   * @param array|null $included_paths
+   *   (optional) Any include paths that should be appended to the expected
+   *   response.
    *
    * @return \Drupal\jsonapi\ResourceResponse
    *   A ResourceResponse for the expected entity collection.
    *
    * @see \GuzzleHttp\ClientInterface::request()
    */
-  protected function getExpectedCollectionResponse(array $collection, $self_link, array $request_options) {
+  protected function getExpectedCollectionResponse(array $collection, $self_link, array $request_options, array $included_paths = NULL) {
     $resource_identifiers = array_map([static::class, 'toResourceIdentifier'], $collection);
     $individual_responses = static::toResourceResponses($this->getResponses(static::getResourceLinks($resource_identifiers), $request_options));
     $merged_response = static::toCollectionResourceResponse($individual_responses, $self_link, TRUE);
@@ -1202,7 +1219,26 @@ abstract class ResourceTestBase extends BrowserTestBase {
     $collection_response = ResourceResponse::create($merged_document);
     $collection_response->addCacheableDependency($cacheability);
 
-    return $collection_response;
+    if (is_null($included_paths)) {
+      return $collection_response;
+    }
+
+    $related_responses = array_reduce($collection, function ($related_responses, EntityInterface $entity) use ($included_paths, $request_options, $self_link) {
+      if (!$entity->access('view', $this->account) && !$entity->access('view label', $this->account)) {
+        return $related_responses;
+      }
+      $expected_related_responses = $this->getExpectedRelatedResponses($included_paths, $request_options, $entity);
+      if (empty($related_responses)) {
+        return $expected_related_responses;
+      }
+      foreach ($included_paths as $included_path) {
+        $both_responses = [$related_responses[$included_path], $expected_related_responses[$included_path]];
+        $related_responses[$included_path] = static::toCollectionResourceResponse($both_responses, $self_link, TRUE);
+      }
+      return $related_responses;
+    }, []);
+
+    return static::decorateExpectedResponseForIncludedFields($collection_response, $related_responses);
   }
 
   /**
@@ -1716,6 +1752,9 @@ abstract class ResourceTestBase extends BrowserTestBase {
       $access = static::entityFieldAccess($entity, $internal_name, 'view', $this->account);
       if (!$access->isAllowed()) {
         $detail = 'The current user is not allowed to view this relationship.';
+        if (!$entity->access('view') && $entity->access('view label') && $access instanceof AccessResultReasonInterface && empty($access->getReason())) {
+          $access->setReason("The user only has authorization for the 'view label' operation.");
+        }
         $via_link = Url::fromRoute(
           sprintf('jsonapi.%s.%s.related', $base_resource_identifier['type'], $relationship_field_name),
           ['entity' => $base_resource_identifier['id']]
@@ -1754,57 +1793,6 @@ abstract class ResourceTestBase extends BrowserTestBase {
       $expected_related_responses[$relationship_field_name] = $related_response;
     }
     return $expected_related_responses ?: [];
-  }
-
-  /**
-   * Gets an expected ResourceResponse with includes for the given field set.
-   *
-   * @param string[] $include_paths
-   *   A list of include field paths for which to get an expected response.
-   * @param array $request_options
-   *   Request options to apply.
-   *
-   * @return \Drupal\jsonapi\ResourceResponse
-   *   The expected ResourceResponse.
-   *
-   * @see \GuzzleHttp\ClientInterface::request()
-   */
-  protected function getExpectedIncludeResponse(array $include_paths, array $request_options) {
-    $individual_response = $this->getExpectedGetIndividualResourceResponse();
-    $expected_document = $individual_response->getResponseData();
-    $self_link = Url::fromRoute(
-      sprintf('jsonapi.%s.individual', static::$resourceTypeName),
-      ['entity' => $this->entity->uuid()],
-      ['query' => ['include' => implode(',', $include_paths)]]
-    )->setAbsolute()->toString();
-    $expected_document['links']['self']['href'] = $self_link;
-    // If there can be no included data, just return the response with the
-    // updated 'self' link as is.
-    if (empty($include_paths)) {
-      return (new ResourceResponse($expected_document))
-        ->addCacheableDependency($individual_response->getCacheableMetadata());
-    }
-    $resource_data = $this->getExpectedIncludedResourceResponse($include_paths, $request_options);
-    $resource_document = $resource_data->getResponseData();
-    if (isset($resource_document['data'])) {
-      foreach ($resource_document['data'] as $related_resource) {
-        if (empty($expected_document['included']) || !static::collectionHasResourceIdentifier($related_resource, $expected_document['included'])) {
-          $expected_document['included'][] = $related_resource;
-        }
-      }
-    }
-    if (isset($resource_document['meta']['omitted'])) {
-      // @todo remove this loop when inaccessible relationships are able to raise errors in https://www.drupal.org/project/jsonapi/issues/2956084.
-      foreach ($resource_document['meta']['omitted']['links'] as $link_key => $link) {
-        if ($link_key !== 'help' && strpos($link['meta']['detail'], 'The current user is not allowed to view this relationship.') === 0) {
-          unset($resource_document['meta']['omitted']['links'][$link_key]);
-        }
-      }
-      static::addOmittedObject($expected_document, $resource_document['meta']['omitted']);
-    }
-    return $expected_response = (new ResourceResponse($expected_document))
-      ->addCacheableDependency($individual_response->getCacheableMetadata())
-      ->addCacheableDependency($resource_data->getCacheableMetadata());
   }
 
   /**
@@ -2579,14 +2567,12 @@ abstract class ResourceTestBase extends BrowserTestBase {
     }
 
     foreach ($field_sets as $type => $included_paths) {
-      foreach (array_intersect_key(static::getIncludePermissions(), array_flip($included_paths)) as $permissions) {
-        $this->grantPermissionsToTestedRole($permissions);
-      }
-      $expected_response = $this->getExpectedIncludeResponse($included_paths, $request_options);
+      $this->grantIncludedPermissions($included_paths);
       $query = ['include' => implode(',', $included_paths)];
       $url->setOption('query', $query);
       $actual_response = $this->request('GET', $url, $request_options);
       $response_document = Json::decode((string) $actual_response->getBody());
+      $expected_response = $this->getExpectedIncludedResourceResponse($included_paths, $request_options);
       $expected_document = $expected_response->getResponseData();
       // @todo uncomment this assertion in https://www.drupal.org/project/jsonapi/issues/2929428
       // Dynamic Page Cache miss because cache should vary based on the
@@ -2632,8 +2618,7 @@ abstract class ResourceTestBase extends BrowserTestBase {
       // If any of the related response documents had omitted items or errors,
       // we should later expect the document to have omitted items as well.
       if (!empty($related_document['errors'])) {
-        // @todo uncomment this when inaccessible relationships are able to raise errors in https://www.drupal.org/project/jsonapi/issues/2956084.
-        /* static::addOmittedObject($expected_document, static::errorsToOmittedObject($related_document['errors'])); */
+        static::addOmittedObject($expected_document, static::errorsToOmittedObject($related_document['errors']));
       }
       if (!empty($related_document['meta']['omitted'])) {
         static::addOmittedObject($expected_document, $related_document['meta']['omitted']);
@@ -2650,18 +2635,14 @@ abstract class ResourceTestBase extends BrowserTestBase {
         }
       }
     }
-    if (!empty($expected_document['meta']['errors'])) {
-      $deduplicated = [];
-      foreach ($expected_document['meta']['errors'] as $error) {
-        $deduplicated[$error['id']] = $error;
-      }
-      $expected_document['meta']['errors'] = array_values($deduplicated);
-    }
     return (new ResourceResponse($expected_document))->addCacheableDependency($expected_cacheability);
   }
 
   /**
    * Gets the expected individual ResourceResponse for GET.
+   *
+   * @return \Drupal\jsonapi\ResourceResponse
+   *   The expected individual ResourceResponse.
    */
   protected function getExpectedGetIndividualResourceResponse($status_code = 200) {
     $resource_response = new ResourceResponse($this->getExpectedDocument(), $status_code);
@@ -2823,6 +2804,20 @@ abstract class ResourceTestBase extends BrowserTestBase {
     $main_property = $item_definition->getMainPropertyName();
     $property_definition = $item_definition->getPropertyDefinition($main_property);
     return $property_definition instanceof DataReferenceTargetDefinition;
+  }
+
+  /**
+   * Grants authorization to view includes.
+   *
+   * @param string[] $include_paths
+   *   An array of include paths for which to grant access.
+   */
+  protected function grantIncludedPermissions(array $include_paths = []) {
+    $applicable_permissions = array_intersect_key(static::getIncludePermissions(), array_flip($include_paths));
+    $flattened_permissions = array_unique(array_reduce($applicable_permissions, 'array_merge', []));
+    // Always grant access to 'view' the test entity reference field.
+    $flattened_permissions[] = 'field_jsonapi_test_entity_ref view access';
+    $this->grantPermissionsToTestedRole($flattened_permissions);
   }
 
 }

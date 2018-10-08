@@ -126,6 +126,9 @@ trait ResourceResponseTestTrait {
         $collected_responses = [];
         $field_access = static::entityFieldAccess($entity, $field_name, 'view', $this->account);
         if (!$field_access->isAllowed()) {
+          if (!$entity->access('view') && $entity->access('view label') && $field_access instanceof AccessResultReasonInterface && empty($field_access->getReason())) {
+            $field_access->setReason("The user only has authorization for the 'view label' operation.");
+          }
           $via_link = Url::fromRoute(
             sprintf('jsonapi.%s.%s.related', $entity->getEntityTypeId() . '--' . $entity->bundle(), $public_field_name),
             ['entity' => $entity->uuid()]
@@ -160,7 +163,31 @@ trait ResourceResponseTestTrait {
       }
       return $data;
     }, ['responses' => [], 'already_checked' => []]);
-    return static::toCollectionResourceResponse($resource_data['responses'], NULL, TRUE);
+
+    $individual_document = $this->getExpectedDocument();
+
+    $expected_base_url = Url::fromRoute(sprintf('jsonapi.%s.individual', static::$resourceTypeName), ['entity' => $this->entity->uuid()])->setAbsolute();
+    $include_url = clone $expected_base_url;
+    $query = ['include' => implode(',', $include_paths)];
+    $include_url->setOption('query', $query);
+    $individual_document['links']['self']['href'] = $include_url->toString();
+
+    // The test entity reference field should always be present.
+    if (!isset($individual_document['data']['relationships']['field_jsonapi_test_entity_ref'])) {
+      $individual_document['data']['relationships']['field_jsonapi_test_entity_ref'] = [
+        'data' => [],
+        'links' => [
+          'related' => [
+            'href' => $expected_base_url->toString() . '/field_jsonapi_test_entity_ref',
+          ],
+          'self' => [
+            'href' => $expected_base_url->toString() . '/relationships/field_jsonapi_test_entity_ref',
+          ],
+        ],
+      ];
+    }
+
+    return static::decorateExpectedResponseForIncludedFields(ResourceResponse::create($individual_document), $resource_data['responses']);
   }
 
   /**
@@ -514,11 +541,6 @@ trait ResourceResponseTestTrait {
    *   The omitted object.
    */
   protected static function addOmittedObject(array &$document, array $omitted) {
-    // @todo: remove this guard when inaccessible relationships are able to raise errors in https://www.drupal.org/project/jsonapi/issues/2956084.
-    // Only add links to the document if links other than 'help' exist.
-    if (empty(array_diff_key($omitted['links'], array_flip(['help'])))) {
-      return;
-    }
     if (isset($document['meta']['omitted'])) {
       $document['meta']['omitted'] = static::mergeOmittedObjects($document['meta']['omitted'], $omitted);
     }
@@ -573,7 +595,7 @@ trait ResourceResponseTestTrait {
     $merged['links']['help']['href'] = 'https://www.drupal.org/docs/8/modules/json-api/filtering#filters-access-control';
     $a_links = array_diff_key($a['links'], array_flip(['help']));
     $b_links = array_diff_key($b['links'], array_flip(['help']));
-    foreach (array_merge($a_links, $b_links) as $link) {
+    foreach (array_merge(array_values($a_links), array_values($b_links)) as $link) {
       $merged['links'][$link['href'] . $link['meta']['detail']] = $link;
     }
     static::resetOmittedLinkKeys($merged);

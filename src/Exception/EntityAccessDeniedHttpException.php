@@ -46,18 +46,22 @@ class EntityAccessDeniedHttpException extends CacheableAccessDeniedHttpException
    *   (optional) The pointer.
    * @param string $message
    *   (Optional) The display to display.
+   * @param string $relationship_field
+   *   (Optional) A relationship field name if access was denied because the
+   *   user does not have permission to view an entity's relationship field.
    * @param \Exception|null $previous
    *   The previous exception.
    * @param int $code
    *   The code.
    */
-  public function __construct($entity, AccessResultInterface $entity_access, $pointer, $message = 'The current user is not allowed to GET the selected resource.', \Exception $previous = NULL, $code = 0) {
+  public function __construct($entity, AccessResultInterface $entity_access, $pointer, $message = 'The current user is not allowed to GET the selected resource.', $relationship_field = NULL, \Exception $previous = NULL, $code = 0) {
     assert(is_null($entity) || $entity instanceof EntityInterface);
     parent::__construct(CacheableMetadata::createFromObject($entity_access), $message, $previous, $code);
     $error = [
       'entity' => $entity,
       'pointer' => $pointer,
       'reason' => NULL,
+      'relationship_field' => $relationship_field,
     ];
     if ($entity_access instanceof AccessResultReasonInterface) {
       $error['reason'] = $entity_access->getReason();

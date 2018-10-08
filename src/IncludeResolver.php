@@ -2,12 +2,14 @@
 
 namespace Drupal\jsonapi;
 
+use Drupal\Core\Access\AccessResult;
 use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Entity\FieldableEntityInterface;
 use Drupal\Core\Field\Plugin\Field\FieldType\EntityReferenceItem;
 use Drupal\jsonapi\Context\FieldResolver;
 use Drupal\jsonapi\Controller\EntityResource;
+use Drupal\jsonapi\Exception\EntityAccessDeniedHttpException;
 use Drupal\jsonapi\JsonApiResource\EntityCollection;
 use Drupal\jsonapi\ResourceType\ResourceType;
 
@@ -92,7 +94,13 @@ class IncludeResolver {
         // Some entities in the collection may be LabelOnlyEntity objects or
         // EntityAccessDeniedHttpException objects, or they may be entities
         // which do not have fields and cannot have relationships.
-        if (!$entity instanceof FieldableEntityInterface) {
+        if ($entity instanceof LabelOnlyEntity) {
+          $message = "The current user is not allowed to view this relationship.";
+          $exception = new EntityAccessDeniedHttpException($entity->getEntity(), AccessResult::forbidden("The user only has authorization for the 'view label' operation."), '', $message, $field_name);
+          $includes = EntityCollection::merge($includes, new EntityCollection([$exception]));
+          continue;
+        }
+        elseif (!$entity instanceof FieldableEntityInterface) {
           continue;
         }
         // Not all entities in $entity_collection will be of the same bundle and
@@ -103,7 +111,11 @@ class IncludeResolver {
         }
         $field_list = $entity->get($field_name);
         // @todo: raise an omitted item to an inaccessible related field in https://www.drupal.org/project/jsonapi/issues/2956084.
-        if (!$field_list->access('view')) {
+        $field_access = $field_list->access('view', NULL, TRUE);
+        if (!$field_access->isAllowed()) {
+          $message = 'The current user is not allowed to view this relationship.';
+          $exception = new EntityAccessDeniedHttpException($entity, $field_access, '', $message, $field_name);
+          $includes = EntityCollection::merge($includes, new EntityCollection([$exception]));
           continue;
         }
         $target_type = $field_list->getFieldDefinition()->getFieldStorageDefinition()->getSetting('target_type');

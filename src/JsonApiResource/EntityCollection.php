@@ -173,11 +173,15 @@ class EntityCollection implements \IteratorAggregate, \Countable {
     foreach ($collection as $resource) {
       if ($resource instanceof EntityInterface) {
         $resource_identifier = ResourceIdentifier::fromEntity($resource);
-        $deduplicated[$resource_identifier->getTypeName() . ':' . $resource_identifier->getId()] = $resource;
+        $dedupe_key = $resource_identifier->getTypeName() . ':' . $resource_identifier->getId();
       }
       else {
-        $deduplicated[$resource->getTypeName() . ':' . $resource->getId()] = $resource;
+        $dedupe_key = $resource->getTypeName() . ':' . $resource->getId();
+        if ($resource instanceof EntityAccessDeniedHttpException && ($error = $resource->getError()) && !is_null($error['relationship_field'])) {
+          $dedupe_key .= ':' . $error['relationship_field'];
+        }
       }
+      $deduplicated[$dedupe_key] = $resource;
     }
     return new static(array_values($deduplicated));
   }
