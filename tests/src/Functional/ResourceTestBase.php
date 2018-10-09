@@ -2765,9 +2765,7 @@ abstract class ResourceTestBase extends BrowserTestBase {
     $get_nested_relationship_field_names = function (EntityInterface $entity, $depth, $path = "") use (&$get_nested_relationship_field_names) {
       $relationship_field_names = $this->getRelationshipFieldNames($entity);
       if ($depth > 0) {
-        // @todo remove the line below and uncomment the following line in https://www.drupal.org/project/jsonapi/issues/2946537
-        $paths = ($path) ? [$path] : [];
-        /* $paths = []; */
+        $paths = [];
         foreach ($relationship_field_names as $field_name) {
           $next = ($path) ? "$path.$field_name" : $field_name;
           $internal_field_name = $this->resourceType->getInternalName($field_name);

@@ -117,13 +117,15 @@ trait ResourceResponseTestTrait {
    * @see \GuzzleHttp\ClientInterface::request()
    */
   protected function getExpectedIncludedResourceResponse(array $include_paths, array $request_options) {
-    $resource_data = array_reduce($include_paths, function ($data, $path) use ($request_options) {
+    $resource_type = $this->resourceType;
+    $resource_data = array_reduce($include_paths, function ($data, $path) use ($request_options, $resource_type) {
       $field_names = explode('.', $path);
       /* @var \Drupal\Core\Entity\EntityInterface $entity */
       $entity = $this->entity;
+      $collected_responses = [];
       foreach ($field_names as $public_field_name) {
-        $field_name = $this->resourceType->getInternalName($public_field_name);
-        $collected_responses = [];
+        $resource_type = $this->container->get('jsonapi.resource_type.repository')->get($entity->getEntityTypeId(), $entity->bundle());
+        $field_name = $resource_type->getInternalName($public_field_name);
         $field_access = static::entityFieldAccess($entity, $field_name, 'view', $this->account);
         if (!$field_access->isAllowed()) {
           if (!$entity->access('view') && $entity->access('view label') && $field_access instanceof AccessResultReasonInterface && empty($field_access->getReason())) {
