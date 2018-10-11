@@ -12,6 +12,7 @@ use Drupal\Core\Entity\EntityRepositoryInterface;
 use Drupal\Core\Entity\EntityStorageInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Entity\FieldableEntityInterface;
+use Drupal\Core\Entity\Query\QueryInterface;
 use Drupal\Core\Field\FieldDefinitionInterface;
 use Drupal\Core\Field\FieldItemListInterface;
 use Drupal\Core\Render\RenderContext;
@@ -342,19 +343,10 @@ class EntityResource {
     $query_cacheability = new CacheableMetadata();
 
     try {
-      // Execute the query in a render context, to catch bubbled cacheability.
-      // @see node_query_node_access_alter()
-      // @see https://www.drupal.org/project/drupal/issues/2557815
-      // @see https://www.drupal.org/project/drupal/issues/2794385
-      // @todo Remove this when the query sytems's return value is able to carry
-      // cacheability.
-      $context = new RenderContext();
-      $results = $this->renderer->executeInRenderContext($context, function () use ($query) {
-        return $query->execute();
-      });
-      if (!$context->isEmpty()) {
-        $query_cacheability->addCacheableDependency($context->pop());
-      }
+      $results = $this->executeQueryInRenderContext(
+        $query,
+        $query_cacheability
+      );
     }
     catch (\LogicException $e) {
       // Ensure good DX when an entity query involves a config entity type.
@@ -385,10 +377,13 @@ class EntityResource {
     $entity_collection->setHasNextPage($has_next_page);
 
     // Calculate all the results and pass them to the EntityCollectionInterface.
+    $count_query_cacheability = new CacheableMetadata();
     if ($resource_type->includeCount()) {
-      $total_results = $this
-        ->getCollectionCountQuery($resource_type, $params)
-        ->execute();
+      $count_query = $this->getCollectionCountQuery($resource_type, $params);
+      $total_results = $this->executeQueryInRenderContext(
+        $count_query,
+        $count_query_cacheability
+      );
 
       $entity_collection->setTotalCount($total_results);
     }
@@ -396,8 +391,39 @@ class EntityResource {
     $response = $this->respondWithCollection($entity_collection, $this->getIncludes($request, $entity_collection), $request, $resource_type);
 
     $response->addCacheableDependency($query_cacheability);
+    $response->addCacheableDependency($count_query_cacheability);
 
     return $response;
+  }
+
+  /**
+   * Executes the query in a render context, to catch bubbled cacheability.
+   *
+   * @param \Drupal\Core\Entity\Query\QueryInterface $query
+   *   The query to execute to get the return results.
+   * @param \Drupal\Core\Cache\CacheableMetadata $query_cacheability
+   *   The value object to carry the query cacheability.
+   *
+   * @return int|array
+   *   Returns an integer for count queries or an array of IDs. The values of
+   *   the array are always entity IDs. The keys will be revision IDs if the
+   *   entity supports revision and entity IDs if not.
+   *
+   * @see node_query_node_access_alter()
+   * @see https://www.drupal.org/project/drupal/issues/2557815
+   * @see https://www.drupal.org/project/drupal/issues/2794385
+   * @todo Remove this when the query sytems's return value is able to carry
+   * cacheability.
+   */
+  protected function executeQueryInRenderContext(QueryInterface $query, CacheableMetadata $query_cacheability) {
+    $context = new RenderContext();
+    $results = $this->renderer->executeInRenderContext($context, function () use ($query) {
+      return $query->execute();
+    });
+    if (!$context->isEmpty()) {
+      $query_cacheability->addCacheableDependency($context->pop());
+    }
+    return $results;
   }
 
   /**
