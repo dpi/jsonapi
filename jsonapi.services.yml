@@ -121,11 +121,11 @@ services:
     tags:
       - { name: access_check, applies_to: _jsonapi_relationship_field_access, needs_incoming_request: TRUE }
   paramconverter.jsonapi.entity_uuid:
+    parent: paramconverter.entity
     class: Drupal\jsonapi\ParamConverter\EntityUuidConverter
     tags:
       # Priority 10, to ensure it runs before @paramconverter.entity.
       - { name: paramconverter, priority: 10 }
-    arguments: ['@entity.manager']
   paramconverter.jsonapi.resource_type:
     class: Drupal\jsonapi\ParamConverter\ResourceTypeConverter
     arguments: ['@jsonapi.resource_type.repository']
