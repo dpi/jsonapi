@@ -64,13 +64,6 @@ class ResourceTypeRepository implements ResourceTypeRepositoryInterface {
   protected $staticCache;
 
   /**
-   * Class to instantiate for resource type objects.
-   *
-   * @var string
-   */
-  const RESOURCE_TYPE_CLASS = ResourceType::class;
-
-  /**
    * Instantiates a ResourceTypeRepository object.
    *
    * @param \Drupal\Core\Entity\EntityTypeManagerInterface $entity_type_manager
@@ -98,19 +91,9 @@ class ResourceTypeRepository implements ResourceTypeRepositoryInterface {
       $entity_type_ids = array_keys($this->entityTypeManager->getDefinitions());
       $resource_types = [];
       foreach ($entity_type_ids as $entity_type_id) {
-        $resource_type_class = static::RESOURCE_TYPE_CLASS;
-        $resource_types = array_merge($resource_types, array_map(function ($bundle) use ($entity_type_id, $resource_type_class) {
+        $resource_types = array_merge($resource_types, array_map(function ($bundle) use ($entity_type_id) {
           $entity_type = $this->entityTypeManager->getDefinition($entity_type_id);
-          $raw_fields = $this->getAllFieldNames($entity_type, $bundle);
-          return new $resource_type_class(
-            $entity_type_id,
-            $bundle,
-            $entity_type->getClass(),
-            $entity_type->isInternal(),
-            static::isLocatableResourceType($entity_type, $bundle),
-            static::isMutableResourceType($entity_type, $bundle),
-            static::getFieldMapping($raw_fields, $entity_type, $bundle)
-          );
+          return $this->createResourceType($entity_type, $bundle);
         }, array_keys($this->entityTypeBundleInfo->getBundleInfo($entity_type_id))));
       }
       foreach ($resource_types as $resource_type) {
@@ -120,6 +103,30 @@ class ResourceTypeRepository implements ResourceTypeRepositoryInterface {
       $this->staticCache->set('jsonapi.resource_types', $resource_types, Cache::PERMANENT, ['jsonapi_resource_types']);
     }
     return $cached ? $cached->data : $resource_types;
+  }
+
+  /**
+   * Creates a ResourceType value object for the given entity type + bundle.
+   *
+   * @param \Drupal\Core\Entity\EntityTypeInterface $entity_type
+   *   The entity type to create a JSON API resource type for.
+   * @param string $bundle
+   *   The entity type bundle to create a JSON API resource type for.
+   *
+   * @return \Drupal\jsonapi\ResourceType\ResourceType
+   *   A JSON API resource type.
+   */
+  protected function createResourceType(EntityTypeInterface $entity_type, $bundle) {
+    $raw_fields = $this->getAllFieldNames($entity_type, $bundle);
+    return new ResourceType(
+      $entity_type->id(),
+      $bundle,
+      $entity_type->getClass(),
+      $entity_type->isInternal(),
+      static::isLocatableResourceType($entity_type, $bundle),
+      static::isMutableResourceType($entity_type, $bundle),
+      static::getFieldMapping($raw_fields, $entity_type, $bundle)
+    );
   }
 
   /**
