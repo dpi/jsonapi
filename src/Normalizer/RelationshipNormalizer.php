@@ -104,7 +104,7 @@ class RelationshipNormalizer extends NormalizerBase implements DenormalizerInter
     // This is typically 'target_id'.
     $item_definition = $field_definition->getItemDefinition();
     $property_key = $item_definition->getMainPropertyName();
-    $target_resource_types = $resource_type->getRelatableResourceTypesByField($context['related']);
+    $target_resource_types = $resource_type->getRelatableResourceTypesByField($resource_type->getPublicName($context['related']));
     $target_resource_type_names = array_map(function (ResourceType $resource_type) {
       return $resource_type->getTypeName();
     }, $target_resource_types);

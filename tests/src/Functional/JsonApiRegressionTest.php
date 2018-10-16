@@ -13,6 +13,7 @@ use Drupal\node\Entity\Node;
 use Drupal\node\Entity\NodeType;
 use Drupal\taxonomy\Entity\Term;
 use Drupal\taxonomy\Entity\Vocabulary;
+use Drupal\user\Entity\User;
 use GuzzleHttp\RequestOptions;
 
 /**
@@ -496,6 +497,62 @@ class JsonApiRegressionTest extends JsonApiFunctionalTestBase {
 
     $response = $this->request('GET', Url::fromUri('internal:/jsonapi/node/dog'), $request_options);
     $this->assertSame(404, $response->getStatusCode());
+  }
+
+  /**
+   * Ensures denormalizing relationships with aliased field names works.
+   *
+   * @see https://www.drupal.org/project/jsonapi/issues/3007113
+   * @see https://www.drupal.org/project/jsonapi_extras/issues/3004582#comment-12817261
+   */
+  public function testDenormalizeAliasedRelationshipFromIssue2953207() {
+    // Since the JSON API module does not have an explicit mechanism to set up
+    // field aliases, create a strange data model so that automatic aliasing
+    // allows us to test aliased relationships.
+    // @see \Drupal\jsonapi\ResourceType\ResourceTypeRepository::getFieldMapping()
+    $internal_relationship_field_name = 'type';
+    $public_relationship_field_name = 'taxonomy_term_' . $internal_relationship_field_name;
+
+    // Set up data model.
+    $this->createEntityReferenceField(
+      'taxonomy_term',
+      'tags',
+      $internal_relationship_field_name,
+      NULL,
+      'user'
+    );
+    $this->rebuildAll();
+
+    // Create data.
+    Term::create([
+      'name' => 'foobar',
+      'vid' => 'tags',
+      'type' => ['target_id' => 1],
+    ])->save();
+
+    // Test.
+    $user = $this->drupalCreateUser([
+      'edit terms in tags',
+    ]);
+    $body = [
+      'data' => [
+        'type' => 'user--user',
+        'id' => User::load(0)->uuid(),
+      ],
+    ];
+
+    // Test.
+    $response = $this->request('PATCH', Url::fromUri(sprintf('internal:/jsonapi/taxonomy_term/tags/%s/relationships/%s', Term::load(1)->uuid(), $public_relationship_field_name)), [
+      RequestOptions::AUTH => [
+        $user->getUsername(),
+        $user->pass_raw,
+      ],
+      RequestOptions::HEADERS => [
+        'Content-Type' => 'application/vnd.api+json',
+      ],
+      RequestOptions::BODY => Json::encode($body),
+    ]);
+    $this->assertSame(204, $response->getStatusCode());
   }
 
 }
