@@ -149,8 +149,8 @@ class NodeTest extends ResourceTestBase {
           'status' => TRUE,
           'sticky' => FALSE,
           'title' => 'Llama',
-          'vid' => 1,
           'drupal_internal__nid' => 1,
+          'drupal_internal__vid' => 1,
         ],
         'relationships' => [
           'node_type' => [

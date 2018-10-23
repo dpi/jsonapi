@@ -110,7 +110,6 @@ class BlockContentTest extends ResourceTestBase {
           ],
           'changed' => (new \DateTime())->setTimestamp($this->entity->getChangedTime())->setTimezone(new \DateTimeZone('UTC'))->format(\DateTime::RFC3339),
           'info' => 'Llama',
-          'revision_id' => 1,
           'revision_log' => NULL,
           'revision_created' => (new \DateTime())->setTimestamp($this->entity->getRevisionCreationTime())->setTimezone(new \DateTimeZone('UTC'))->format(\DateTime::RFC3339),
           'revision_translation_affected' => TRUE,
@@ -118,6 +117,7 @@ class BlockContentTest extends ResourceTestBase {
           'langcode' => 'en',
           'default_langcode' => TRUE,
           'drupal_internal__id' => 1,
+          'drupal_internal__revision_id' => 1,
         ],
         'relationships' => [
           'block_content_type' => [

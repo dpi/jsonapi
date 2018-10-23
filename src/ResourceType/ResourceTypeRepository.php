@@ -189,10 +189,15 @@ class ResourceTypeRepository implements ResourceTypeRepositoryInterface {
     //   necessary for certain Drupal-coupled clients, so we alias it.
     // - exposing its UUID as an attribute is useless (it's already part of
     //   the mandatory "id" attribute in JSON API)
+    // - exposing its revision ID as an attribute will compete with any profile
+    //   defined meta members used for resource object versioning.
     // @see http://jsonapi.org/format/#document-resource-identifier-objects
     $mapping[$entity_type->getKey('uuid')] = FALSE;
     $id_field_name = $entity_type->getKey('id');
     $mapping[$id_field_name] = "drupal_internal__$id_field_name";
+    if ($entity_type->isRevisionable() && ($revision_id_field_name = $entity_type->getKey('revision'))) {
+      $mapping[$revision_id_field_name] = "drupal_internal__$revision_id_field_name";
+    }
     if ($entity_type instanceof ConfigEntityTypeInterface) {
       // The '_core' key is reserved by Drupal core to handle complex edge cases
       // correctly. Data in the '_core' key is irrelevant to clients reading
