@@ -7,6 +7,7 @@ use Drupal\Core\Field\FieldItemInterface;
 use Drupal\Core\Field\TypedData\FieldItemDataDefinitionInterface;
 use Drupal\Core\TypedData\TypedDataInternalPropertiesHelper;
 use Drupal\jsonapi\Normalizer\Value\FieldItemNormalizerValue;
+use Drupal\serialization\Normalizer\CacheableNormalizerInterface;
 use Symfony\Component\Serializer\Normalizer\DenormalizerInterface;
 
 /**
@@ -47,8 +48,7 @@ class FieldItemNormalizer extends NormalizerBase implements DenormalizerInterfac
       ? TypedDataInternalPropertiesHelper::getNonInternalProperties($field_item)
       : $field_item->getValue();
 
-    // @todo Use the constant \Drupal\serialization\Normalizer\CacheableNormalizerInterface::SERIALIZATION_CONTEXT_CACHEABILITY instead of the 'cacheability' string when JSON API requires Drupal 8.5 or newer.
-    $context['cacheability'] = new CacheableMetadata();
+    $context[CacheableNormalizerInterface::SERIALIZATION_CONTEXT_CACHEABILITY] = new CacheableMetadata();
 
     foreach ($field_properties as $property_name => $property) {
       $values[$property_name] = $this->serializer->normalize($property, $format, $context);
@@ -57,9 +57,8 @@ class FieldItemNormalizer extends NormalizerBase implements DenormalizerInterfac
     if (isset($context['langcode'])) {
       $values['lang'] = $context['langcode'];
     }
-    // @todo Use the constant \Drupal\serialization\Normalizer\CacheableNormalizerInterface::SERIALIZATION_CONTEXT_CACHEABILITY instead of the 'cacheability' string when JSON API requires Drupal 8.5 or newer.
-    $value = new FieldItemNormalizerValue($values, $context['cacheability']);
-    unset($context['cacheability']);
+    $value = new FieldItemNormalizerValue($values, $context[CacheableNormalizerInterface::SERIALIZATION_CONTEXT_CACHEABILITY]);
+    unset($context[CacheableNormalizerInterface::SERIALIZATION_CONTEXT_CACHEABILITY]);
     return $value;
   }
 

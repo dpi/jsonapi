@@ -2,6 +2,7 @@
 
 namespace Drupal\jsonapi\Normalizer;
 
+use Drupal\Core\Cache\CacheableMetadata;
 use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Entity\EntityRepositoryInterface;
 use Drupal\Core\Field\EntityReferenceFieldItemListInterface;
@@ -9,6 +10,7 @@ use Drupal\Core\TypedData\TypedDataInternalPropertiesHelper;
 use Drupal\jsonapi\Normalizer\Value\NullFieldNormalizerValue;
 use Drupal\jsonapi\ResourceType\ResourceTypeRepositoryInterface;
 use Drupal\jsonapi\JsonApiResource\EntityCollection;
+use Drupal\serialization\Normalizer\CacheableNormalizerInterface;
 
 /**
  * Normalizer class specific for entity reference field objects.
@@ -52,6 +54,8 @@ class EntityReferenceFieldNormalizer extends FieldNormalizer {
     if (!$field_access->isAllowed()) {
       return new NullFieldNormalizerValue($field_access, 'relationships');
     }
+
+    $cacheabilty = CacheableMetadata::createFromObject($field_access);
 
     // Build the relationship object based on the Entity Reference and normalize
     // that object instead.
@@ -102,11 +106,20 @@ class EntityReferenceFieldNormalizer extends FieldNormalizer {
       $metadata = [];
       /** @var \Drupal\Core\TypedData\TypedDataInterface[] $properties */
       $properties = TypedDataInternalPropertiesHelper::getNonInternalProperties($item);
+
+      // This normalizer leaves JSON API normalizer land and enters the land of
+      // Drupal core's serialization system. That system was never designed with
+      // cacheability in mind, and hence bubbles cacheability out of band. This
+      // must catch it, and pass it to the value object that JSON API uses.
+      // @see \Drupal\jsonapi\Normalizer\FieldItemNormalizer::normalize()
+      $context[CacheableNormalizerInterface::SERIALIZATION_CONTEXT_CACHEABILITY] = new CacheableMetadata();
       foreach ($properties as $property_key => $property) {
         if ($property_key !== $main_property) {
           $metadata[$property_key] = $this->serializer->normalize($property, $format, $context);
         }
       }
+      $cacheabilty = $cacheabilty->merge($context[CacheableNormalizerInterface::SERIALIZATION_CONTEXT_CACHEABILITY]);
+      unset($context[CacheableNormalizerInterface::SERIALIZATION_CONTEXT_CACHEABILITY]);
       $entity_list_metadata[] = $metadata;
 
       // Get the referenced entity.
@@ -120,7 +133,7 @@ class EntityReferenceFieldNormalizer extends FieldNormalizer {
       $entity_list[] = $this->entityRepository->getTranslationFromContext($entity);
     }
     $entity_collection = new EntityCollection($entity_list, $cardinality);
-    $relationship = new Relationship($this->resourceTypeRepository, $field->getName(), $entity_collection, $field->getEntity(), $field_access, $cardinality, $main_property, $entity_list_metadata);
+    $relationship = new Relationship($this->resourceTypeRepository, $field->getName(), $entity_collection, $field->getEntity(), $cacheabilty, $cardinality, $main_property, $entity_list_metadata);
     return $this->serializer->normalize($relationship, $format, $context);
   }
 

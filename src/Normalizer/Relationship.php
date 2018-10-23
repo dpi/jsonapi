@@ -3,7 +3,6 @@
 namespace Drupal\jsonapi\Normalizer;
 
 use Drupal\Core\Access\AccessibleInterface;
-use Drupal\Core\Access\AccessResultInterface;
 use Drupal\Core\Cache\CacheableDependencyInterface;
 use Drupal\Core\Cache\CacheableDependencyTrait;
 use Drupal\Core\Entity\EntityInterface;
@@ -71,9 +70,8 @@ class Relationship implements AccessibleInterface, CacheableDependencyInterface 
    *   A collection of entities.
    * @param \Drupal\Core\Entity\EntityInterface $host_entity
    *   The host entity.
-   * @param \Drupal\Core\Access\AccessResultInterface $view_access
-   *   The 'view' field access result. (This value object is only ever used for
-   *   normalization, and hence only for 'view' access.
+   * @param \Drupal\Core\Cache\CacheableDependencyInterface $cacheability
+   *   The cacheability of this relationship and its metadata.
    * @param int $cardinality
    *   The relationship cardinality.
    * @param string $target_key
@@ -82,13 +80,13 @@ class Relationship implements AccessibleInterface, CacheableDependencyInterface 
    *   An array of additional properties stored by the field and that will be
    *   added to the meta in the relationship.
    */
-  public function __construct(ResourceTypeRepositoryInterface $resource_type_repository, $field_name, EntityCollection $entities, EntityInterface $host_entity, AccessResultInterface $view_access, $cardinality = FieldStorageDefinitionInterface::CARDINALITY_UNLIMITED, $target_key = 'target_id', array $entity_list_metadata = []) {
+  public function __construct(ResourceTypeRepositoryInterface $resource_type_repository, $field_name, EntityCollection $entities, EntityInterface $host_entity, CacheableDependencyInterface $cacheability, $cardinality = FieldStorageDefinitionInterface::CARDINALITY_UNLIMITED, $target_key = 'target_id', array $entity_list_metadata = []) {
     $this->resourceTypeRepository = $resource_type_repository;
     $this->propertyName = $field_name;
     $this->cardinality = $cardinality;
     $this->hostEntity = $host_entity;
 
-    $this->setCacheability($view_access);
+    $this->setCacheability($cacheability);
 
     $this->items = [];
     foreach ($entities as $key => $entity) {
