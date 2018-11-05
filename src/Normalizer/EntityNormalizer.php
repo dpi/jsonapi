@@ -116,14 +116,13 @@ class EntityNormalizer extends NormalizerBase implements DenormalizerInterface {
     /* @var Value\FieldNormalizerValueInterface[] $normalizer_values */
     $normalizer_values = [];
     foreach ($this->getFields($entity, $bundle, $resource_type) as $field_name => $field) {
-      $normalized_field = $this->serializeField($field, $context, $format);
-      assert($normalized_field instanceof FieldNormalizerValueInterface);
-
       $in_sparse_fieldset = in_array($field_name, $field_names);
       // Omit fields not listed in sparse fieldsets.
       if (!$in_sparse_fieldset) {
         continue;
       }
+      $normalized_field = $this->serializeField($field, $context, $format);
+      assert($normalized_field instanceof FieldNormalizerValueInterface);
       $normalizer_values[$field_name] = $normalized_field;
     }
 
