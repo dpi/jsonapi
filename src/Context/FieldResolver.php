@@ -83,7 +83,7 @@ class FieldResolver {
   protected $entityTypeBundleInfo;
 
   /**
-   * The JSON API resource type repository service.
+   * The JSON:API resource type repository service.
    *
    * @var \Drupal\jsonapi\ResourceType\ResourceTypeRepositoryInterface
    */
@@ -131,7 +131,7 @@ class FieldResolver {
    * A path of @code field_author_profile.account @endcode might
    * resolve to @code field_author_profile.uid @endcode and @code
    * field_author_profile.field_user @endcode if @code
-   * field_author_profile @endcode can relate to two different JSON API resource
+   * field_author_profile @endcode can relate to two different JSON:API resource
    * types (like `node--profile` and `node--migrated_profile`) which have the
    * external field name @code account @endcode aliased to different internal
    * field names.
@@ -210,7 +210,7 @@ class FieldResolver {
    * to filter a list of content by the name of referenced taxonomy terms.
    *
    * In an effort to simplify the referenced paths and align them with the
-   * structure of JSON API responses and the structure of the hypothetical
+   * structure of JSON:API responses and the structure of the hypothetical
    * "reference document" (see link), it is possible to alias field names and
    * elide the "entity" keyword from them (this word is used by the entity query
    * system to traverse entity references).

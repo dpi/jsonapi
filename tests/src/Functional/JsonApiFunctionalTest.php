@@ -25,7 +25,7 @@ class JsonApiFunctionalTest extends JsonApiFunctionalTestBase {
     // Unpublish the last entity, so we can check access.
     $this->nodes[60]->setUnpublished()->save();
 
-    // 0. HEAD request allows a client to verify that JSON API is installed.
+    // 0. HEAD request allows a client to verify that JSON:API is installed.
     $this->httpClient->request('HEAD', $this->buildUrl('/jsonapi/node/article'));
     $this->assertSession()->statusCodeEquals(200);
     // 1. Load all articles (1st page).
@@ -284,7 +284,7 @@ class JsonApiFunctionalTest extends JsonApiFunctionalTestBase {
     // 19. Test non-existing route without 'Accept' header.
     $this->drupalGet('/jsonapi/node/article/broccoli');
     $this->assertSession()->statusCodeEquals(404);
-    // Even without the 'Accept' header the 404 error is formatted as JSON API.
+    // Even without the 'Accept' header the 404 error is formatted as JSON:API.
     $this->assertSession()->responseHeaderEquals('Content-Type', 'application/vnd.api+json');
     // 20. Test non-existing route with 'Accept' header.
     $single_output = Json::decode($this->drupalGet('/jsonapi/node/article/broccoli', [], [
@@ -293,7 +293,7 @@ class JsonApiFunctionalTest extends JsonApiFunctionalTestBase {
     $this->assertEquals(404, $single_output['errors'][0]['status']);
     $this->assertSession()->statusCodeEquals(404);
     // With the 'Accept' header we can know we want the 404 error formatted as
-    // JSON API.
+    // JSON:API.
     $this->assertSession()->responseHeaderContains('Content-Type', 'application/vnd.api+json');
     // 22. Test sort criteria on multiple fields: both ASC.
     $output = Json::decode($this->drupalGet('/jsonapi/node/article', [

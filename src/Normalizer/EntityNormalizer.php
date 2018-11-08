@@ -17,7 +17,7 @@ use Symfony\Component\HttpKernel\Exception\UnprocessableEntityHttpException;
 use Symfony\Component\Serializer\Normalizer\DenormalizerInterface;
 
 /**
- * Converts the Drupal entity object to a JSON API array structure.
+ * Converts the Drupal entity object to a JSON:API array structure.
  *
  * @internal
  */
@@ -45,7 +45,7 @@ class EntityNormalizer extends NormalizerBase implements DenormalizerInterface {
   protected $linkManager;
 
   /**
-   * The JSON API resource type repository.
+   * The JSON:API resource type repository.
    *
    * @var \Drupal\jsonapi\ResourceType\ResourceTypeRepositoryInterface
    */
@@ -78,7 +78,7 @@ class EntityNormalizer extends NormalizerBase implements DenormalizerInterface {
    * @param \Drupal\jsonapi\LinkManager\LinkManager $link_manager
    *   The link manager.
    * @param \Drupal\jsonapi\ResourceType\ResourceTypeRepositoryInterface $resource_type_repository
-   *   The JSON API resource type repository.
+   *   The JSON:API resource type repository.
    * @param \Drupal\Core\Entity\EntityTypeManagerInterface $entity_type_manager
    *   The entity type manager.
    * @param \Drupal\Core\Entity\EntityFieldManagerInterface $field_manager

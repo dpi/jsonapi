@@ -33,7 +33,7 @@ class FieldResolverTest extends JsonapiKernelTestBase {
   protected $sut;
 
   /**
-   * The JSON API resource type repository.
+   * The JSON:API resource type repository.
    *
    * @var \Drupal\jsonapi\ResourceType\ResourceTypeRepositoryInterface
    */

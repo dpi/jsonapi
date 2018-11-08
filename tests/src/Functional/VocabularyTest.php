@@ -6,7 +6,7 @@ use Drupal\Core\Url;
 use Drupal\taxonomy\Entity\Vocabulary;
 
 /**
- * JSON API integration test for the "vocabulary" config entity type.
+ * JSON:API integration test for the "vocabulary" config entity type.
  *
  * @group jsonapi
  */

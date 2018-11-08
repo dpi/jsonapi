@@ -17,7 +17,7 @@ use Drupal\user\Entity\User;
 use GuzzleHttp\RequestOptions;
 
 /**
- * JSON API regression tests.
+ * JSON:API regression tests.
  *
  * @group jsonapi
  * @group legacy
@@ -441,7 +441,7 @@ class JsonApiRegressionTest extends JsonApiFunctionalTestBase {
   }
 
   /**
-   * Ensures that JSON API routes are caches are dynamically rebuilt.
+   * Ensures that JSON:API routes are caches are dynamically rebuilt.
    *
    * Adding a new relationship field should cause new routes to be immediately
    * regenerated. The site builder should not need to manually rebuild caches.
@@ -506,7 +506,7 @@ class JsonApiRegressionTest extends JsonApiFunctionalTestBase {
    * @see https://www.drupal.org/project/jsonapi_extras/issues/3004582#comment-12817261
    */
   public function testDenormalizeAliasedRelationshipFromIssue2953207() {
-    // Since the JSON API module does not have an explicit mechanism to set up
+    // Since the JSON:API module does not have an explicit mechanism to set up
     // field aliases, create a strange data model so that automatic aliasing
     // allows us to test aliased relationships.
     // @see \Drupal\jsonapi\ResourceType\ResourceTypeRepository::getFieldMapping()
