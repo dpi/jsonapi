@@ -13,7 +13,9 @@ use Drupal\node\Entity\Node;
 use Drupal\node\Entity\NodeType;
 use Drupal\taxonomy\Entity\Term;
 use Drupal\taxonomy\Entity\Vocabulary;
+use Drupal\user\Entity\Role;
 use Drupal\user\Entity\User;
+use Drupal\user\RoleInterface;
 use GuzzleHttp\RequestOptions;
 
 /**
@@ -553,6 +555,41 @@ class JsonApiRegressionTest extends JsonApiFunctionalTestBase {
       RequestOptions::BODY => Json::encode($body),
     ]);
     $this->assertSame(204, $response->getStatusCode());
+  }
+
+  /**
+   * Ensures that Drupal's page cache is effective.
+   *
+   * @see https://www.drupal.org/project/jsonapi/issues/3009596
+   */
+  public function testPageCacheFromIssue3009596() {
+    $anonymous_role = Role::load(RoleInterface::ANONYMOUS_ID);
+    $anonymous_role->grantPermission('access content');
+    $anonymous_role->trustData()->save();
+
+    NodeType::create(['type' => 'emu_fact'])->save();
+    \Drupal::service('router.builder')->rebuildIfNeeded();
+
+    $node = Node::create([
+      'type' => 'emu_fact',
+      'title' => "Emus don't say moo!",
+    ]);
+    $node->save();
+
+    $request_options = [
+      RequestOptions::HEADERS => ['Accept' => 'application/vnd.api+json'],
+    ];
+    $node_url = Url::fromUri('internal:/jsonapi/node/emu_fact/' . $node->uuid());
+
+    // The first request should be a cache MISS.
+    $response = $this->request('GET', $node_url, $request_options);
+    $this->assertSame(200, $response->getStatusCode());
+    $this->assertSame('MISS', $response->getHeader('X-Drupal-Cache')[0]);
+
+    // The second request should be a cache HIT.
+    $response = $this->request('GET', $node_url, $request_options);
+    $this->assertSame(200, $response->getStatusCode());
+    $this->assertSame('HIT', $response->getHeader('X-Drupal-Cache')[0]);
   }
 
 }
