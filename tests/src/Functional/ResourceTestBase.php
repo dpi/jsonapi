@@ -1110,8 +1110,8 @@ abstract class ResourceTestBase extends BrowserTestBase {
         'ids' => [
           'condition' => [
             'operator' => '<>',
-            'path' => $removed->getEntityType()->getKey('id'),
-            'value' => $removed->id(),
+            'path' => 'id',
+            'value' => $removed->uuid(),
           ],
         ],
       ],
@@ -1166,15 +1166,10 @@ abstract class ResourceTestBase extends BrowserTestBase {
     $sorted_entity_collection = $entity_collection;
     uasort($sorted_entity_collection, function (EntityInterface $a, EntityInterface $b) {
       // Sort by ID in reverse order.
-      return strcmp($b->id(), $a->id());
+      return strcmp($b->uuid(), $a->uuid());
     });
-    $id_key = reset($entity_collection)->getEntityType()->getKey('id');
-    if (!$id_key) {
-      // Can't sort without an ID.
-      return;
-    }
     $sorted_collection_include_url = clone $collection_url;
-    $sorted_collection_include_url->setOption('query', array_merge($include, ['sort' => "-{$id_key}"]));
+    $sorted_collection_include_url->setOption('query', array_merge($include, ['sort' => "-id"]));
     $expected_response = $this->getExpectedCollectionResponse($sorted_entity_collection, $sorted_collection_include_url->toString(), $request_options, $relationship_field_names);
     $expected_cacheability = $expected_response->getCacheableMetadata();
     $expected_cacheability->setCacheTags(array_values(array_diff($expected_cacheability->getCacheTags(), ['4xx-response'])));

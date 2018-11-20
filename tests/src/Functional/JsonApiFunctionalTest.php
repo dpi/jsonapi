@@ -181,8 +181,8 @@ class JsonApiFunctionalTest extends JsonApiFunctionalTestBase {
     $this->nodes[1]->save();
     // 13. Test filtering when using short syntax.
     $filter = [
-      'uid.uuid' => ['value' => $this->user->uuid()],
-      'field_tags.uuid' => ['value' => $this->tags[0]->uuid()],
+      'uid.id' => ['value' => $this->user->uuid()],
+      'field_tags.id' => ['value' => $this->tags[0]->uuid()],
     ];
     $single_output = Json::decode($this->drupalGet('/jsonapi/node/article', [
       'query' => ['filter' => $filter, 'include' => 'uid,field_tags'],
@@ -194,14 +194,14 @@ class JsonApiFunctionalTest extends JsonApiFunctionalTestBase {
       'and_group' => ['group' => ['conjunction' => 'AND']],
       'filter_user' => [
         'condition' => [
-          'path' => 'uid.uuid',
+          'path' => 'uid.id',
           'value' => $this->user->uuid(),
           'memberOf' => 'and_group',
         ],
       ],
       'filter_tags' => [
         'condition' => [
-          'path' => 'field_tags.uuid',
+          'path' => 'field_tags.id',
           'value' => $this->tags[0]->uuid(),
           'memberOf' => 'and_group',
         ],
@@ -217,7 +217,7 @@ class JsonApiFunctionalTest extends JsonApiFunctionalTestBase {
       'and_group' => ['group' => ['conjunction' => 'AND']],
       'filter_user' => [
         'condition' => [
-          'name-with-a-typo' => 'uid.uuid',
+          'name-with-a-typo' => 'uid.id',
           'value' => $this->user->uuid(),
           'memberOf' => 'and_group',
         ],
@@ -232,14 +232,14 @@ class JsonApiFunctionalTest extends JsonApiFunctionalTestBase {
       'or_group' => ['group' => ['conjunction' => 'OR']],
       'filter_tags_1' => [
         'condition' => [
-          'path' => 'field_tags.uuid',
+          'path' => 'field_tags.id',
           'value' => $this->tags[0]->uuid(),
           'memberOf' => 'or_group',
         ],
       ],
       'filter_tags_2' => [
         'condition' => [
-          'path' => 'field_tags.uuid',
+          'path' => 'field_tags.id',
           'value' => $this->tags[1]->uuid(),
           'memberOf' => 'or_group',
         ],
