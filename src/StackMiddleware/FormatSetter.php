@@ -7,7 +7,7 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpKernel\HttpKernelInterface;
 
 /**
- * Sets the 'api_json' for requests with a JSON API Content-Type header.
+ * Sets the 'api_json' for requests with a JSON:API Content-Type header.
  *
  * @internal
  */
