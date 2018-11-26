@@ -66,13 +66,13 @@ class EntityReferenceFieldNormalizer extends FieldNormalizer {
       ->getCardinality();
     $entity_list_metadata = [];
     $entity_list = [];
-    foreach ($field as $item) {
+    foreach ($field->filterEmptyItems() as $item) {
       // A non-empty entity reference field that refers to a non-existent entity
       // is not a data integrity problem. For example, Term entities' "parent"
       // entity reference field uses target_id zero to refer to the non-existent
       // "<root>" term. And references to entities that no longer exist are not
       // cleaned up by Drupal; hence we map it to a "missing" resource.
-      if (!$item->isEmpty() && $item->get('entity')->getValue() === NULL) {
+      if ($item->get('entity')->getValue() === NULL) {
         if ($field->getFieldDefinition()->getFieldStorageDefinition()->getSetting('target_type') === 'taxonomy_term' && $item->get('target_id')->getCastedValue() === 0) {
           $entity_list[] = NULL;
           $entity_list_metadata[] = [
