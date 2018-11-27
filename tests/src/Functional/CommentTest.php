@@ -297,7 +297,6 @@ class CommentTest extends ResourceTestBase {
    *   validation errors other than "missing required field".
    */
   public function testPostIndividualDxWithoutCriticalBaseFields() {
-    // @codingStandardsIgnoreStart
     $this->setUpAuthorization('POST');
 
     $url = Url::fromRoute(sprintf('jsonapi.%s.collection.post', static::$resourceTypeName));
@@ -306,41 +305,41 @@ class CommentTest extends ResourceTestBase {
     $request_options[RequestOptions::HEADERS]['Content-Type'] = 'application/vnd.api+json';
     $request_options = NestedArray::mergeDeep($request_options, $this->getAuthenticationRequestOptions());
 
-    $remove_field = function(array $normalization, $type, $attribute_name) {
+    $remove_field = function (array $normalization, $type, $attribute_name) {
       unset($normalization['data'][$type][$attribute_name]);
       return $normalization;
     };
 
     // DX: 422 when missing 'entity_type' field.
-    $request_options[RequestOptions::BODY] = Json::encode($remove_field($this->getPostDocument(), 'attributes',  'entity_type'));
+    $request_options[RequestOptions::BODY] = Json::encode($remove_field($this->getPostDocument(), 'attributes', 'entity_type'));
     $response = $this->request('POST', $url, $request_options);
-    // @todo Uncomment, remove next line in https://www.drupal.org/node/2820364.
-    $this->assertResourceErrorResponse(500, 'The "" entity type does not exist.', $url, $response, FALSE);
-    // $this->assertResourceErrorResponse(422, 'Unprocessable Entity', 'entity_type: This value should not be null.', $response);
+    if (floatval(\Drupal::VERSION) >= 8.7) {
+      $this->assertResourceErrorResponse(422, 'entity_type: This value should not be null.', NULL, $response, '/data/attributes/entity_type');
+    }
+    else {
+      $this->assertResourceErrorResponse(500, 'The "" entity type does not exist.', $url, $response, FALSE);
+    }
 
     // DX: 422 when missing 'entity_id' field.
     $request_options[RequestOptions::BODY] = Json::encode($remove_field($this->getPostDocument(), 'relationships', 'entity_id'));
-    // @todo Remove the try/catch in favor of the two commented lines in
-    // https://www.drupal.org/node/2820364.
+    // @todo Remove the try/catch in https://www.drupal.org/node/2820364.
     try {
       $response = $this->request('POST', $url, $request_options);
-      // This happens on DrupalCI.
-      $this->assertSame(500, $response->getStatusCode());
+      $this->assertResourceErrorResponse(422, 'entity_id: This value should not be null.', NULL, $response, '/data/attributes/entity_id');
     }
     catch (\Exception $e) {
-      // This happens on local development environments
       $this->assertSame("Error: Call to a member function get() on null\nDrupal\\comment\\Plugin\\Validation\\Constraint\\CommentNameConstraintValidator->getAnonymousContactDetailsSetting()() (Line: 96)\n", $e->getMessage());
     }
-    // $response = $this->request('POST', $url, $request_options);
-    // $this->assertResourceErrorResponse(422, 'Unprocessable Entity', 'entity_id: This value should not be null.', $response);
 
     // DX: 422 when missing 'field_name' field.
     $request_options[RequestOptions::BODY] = Json::encode($remove_field($this->getPostDocument(), 'attributes', 'field_name'));
     $response = $this->request('POST', $url, $request_options);
-    // @todo Uncomment, remove next line in https://www.drupal.org/node/2820364.
-    $this->assertResourceErrorResponse(500, 'Field  is unknown.', $url, $response, FALSE);
-    // $this->assertResourceErrorResponse(422, 'Unprocessable Entity', 'field_name: This value should not be null.', $response);
-    // @codingStandardsIgnoreEnd
+    if (floatval(\Drupal::VERSION) >= 8.7) {
+      $this->assertResourceErrorResponse(422, 'field_name: This value should not be null.', NULL, $response, '/data/attributes/field_name');
+    }
+    else {
+      $this->assertSame(500, $response->getStatusCode());
+    }
   }
 
   /**

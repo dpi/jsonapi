@@ -763,8 +763,9 @@ abstract class ResourceTestBase extends BrowserTestBase {
    *   The expected response status.
    * @param string $expected_message
    *   The expected error message.
-   * @param \Drupal\Core\Url $via_link
-   *   The source URL for the errors of the response.
+   * @param \Drupal\Core\Url|null $via_link
+   *   The source URL for the errors of the response. NULL if the error occurs
+   *   for example during entity creation.
    * @param \Psr\Http\Message\ResponseInterface $response
    *   The error response to assert.
    * @param string|false $pointer
@@ -786,7 +787,8 @@ abstract class ResourceTestBase extends BrowserTestBase {
    *   FALSE if that header should be absent. Possible strings: 'MISS', 'HIT'.
    *   Defaults to FALSE.
    */
-  protected function assertResourceErrorResponse($expected_status_code, $expected_message, Url $via_link, ResponseInterface $response, $pointer = FALSE, $expected_cache_tags = FALSE, $expected_cache_contexts = FALSE, $expected_page_cache_header_value = FALSE, $expected_dynamic_page_cache_header_value = FALSE) {
+  protected function assertResourceErrorResponse($expected_status_code, $expected_message, $via_link, ResponseInterface $response, $pointer = FALSE, $expected_cache_tags = FALSE, $expected_cache_contexts = FALSE, $expected_page_cache_header_value = FALSE, $expected_dynamic_page_cache_header_value = FALSE) {
+    assert(is_null($via_link) || $via_link instanceof Url);
     $expected_error = [];
     if (!empty(Response::$statusTexts[$expected_status_code])) {
       $expected_error['title'] = Response::$statusTexts[$expected_status_code];
