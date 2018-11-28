@@ -96,7 +96,7 @@ services:
       - { name: encoder, priority: 21, format: 'api_json' }
   jsonapi.resource_type.repository:
     class: Drupal\jsonapi\ResourceType\ResourceTypeRepository
-    arguments: ['@entity_type.manager', '@entity_type.bundle.info', '@entity_field.manager', '@cache.static']
+    arguments: ['@entity_type.manager', '@entity_type.bundle.info', '@entity_field.manager', '@cache.jsonapi_resource_types']
   jsonapi.route_enhancer:
     class: Drupal\jsonapi\Routing\RouteEnhancer
     tags:
@@ -140,6 +140,11 @@ services:
   logger.channel.jsonapi:
     parent: logger.channel_base
     arguments: ['jsonapi']
+
+  # Cache.
+  cache.jsonapi_resource_types:
+    class: Drupal\Core\Cache\MemoryCache\MemoryCache
+    tags: [{ name: cache.bin }]
 
   # Middleware.
   jsonapi.http_middleware.format_setter:
