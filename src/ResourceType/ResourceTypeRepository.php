@@ -64,6 +64,13 @@ class ResourceTypeRepository implements ResourceTypeRepositoryInterface {
   protected $staticCache;
 
   /**
+   * Instance data cache.
+   *
+   * @var array
+   */
+  protected $cache = [];
+
+  /**
    * Instantiates a ResourceTypeRepository object.
    *
    * @param \Drupal\Core\Entity\EntityTypeManagerInterface $entity_type_manager
@@ -137,12 +144,20 @@ class ResourceTypeRepository implements ResourceTypeRepositoryInterface {
     if (empty($entity_type_id)) {
       throw new PreconditionFailedHttpException('Server error. The current route is malformed.');
     }
-    foreach ($this->all() as $resource) {
-      if ($resource->getEntityTypeId() == $entity_type_id && $resource->getBundle() == $bundle) {
-        return $resource;
+
+    $cid = "jsonapi:resource_type:$entity_type_id:$bundle";
+    if (!array_key_exists($cid, $this->cache)) {
+      $result = NULL;
+      foreach ($this->all() as $resource) {
+        if ($resource->getEntityTypeId() == $entity_type_id && $resource->getBundle() == $bundle) {
+          $result = $resource;
+          break;
+        }
       }
+      $this->cache[$cid] = $result;
     }
-    return NULL;
+
+    return $this->cache[$cid];
   }
 
   /**
