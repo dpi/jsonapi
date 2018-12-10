@@ -144,6 +144,8 @@ services:
   # Cache.
   cache.jsonapi_resource_types:
     class: Drupal\Core\Cache\MemoryCache\MemoryCache
+    # We need this to add this to the Drupal's cache_tags.invalidator service.
+    # This way it can invalidate the data in here based on tags.
     tags: [{ name: cache.bin }]
 
   # Middleware.
