@@ -134,7 +134,7 @@ class MediaTest extends ResourceTestBase {
     $thumbnail = File::load(3);
     $author = User::load($this->entity->getOwnerId());
     $self_url = Url::fromUri('base:/jsonapi/media/camelids/' . $this->entity->uuid())->setAbsolute()->toString(TRUE)->getGeneratedUrl();
-    return [
+    $data = [
       'jsonapi' => [
         'meta' => [
           'links' => [
@@ -187,10 +187,10 @@ class MediaTest extends ResourceTestBase {
             'data' => [
               'id' => $thumbnail->uuid(),
               'meta' => [
-                'alt' => 'Thumbnail',
+                'alt' => '',
                 'width' => 180,
                 'height' => 180,
-                'title' => 'Llama',
+                'title' => NULL,
               ],
               'type' => 'file--file',
             ],
@@ -232,6 +232,12 @@ class MediaTest extends ResourceTestBase {
         ],
       ],
     ];
+    // @todo Make this unconditional when JSON:API requires Drupal 8.6 or newer.
+    if (floatval(\Drupal::VERSION) < 8.6) {
+      $data['data']['relationships']['thumbnail']['data']['meta']['alt'] = 'Thumbnail';
+      $data['data']['relationships']['thumbnail']['data']['meta']['title'] = 'Llama';
+    }
+    return $data;
   }
 
   /**
@@ -319,11 +325,16 @@ class MediaTest extends ResourceTestBase {
     switch ($relationship_field_name) {
       case 'thumbnail':
         $data['meta'] = [
-          'alt' => 'Thumbnail',
+          'alt' => '',
           'width' => 180,
           'height' => 180,
-          'title' => 'Llama',
+          'title' => NULL,
         ];
+        // @todo Make this unconditional when JSON:API requires Drupal 8.6 or newer.
+        if (floatval(\Drupal::VERSION) < 8.6) {
+          $data['meta']['alt'] = 'Thumbnail';
+          $data['meta']['title'] = 'Llama';
+        }
         return $data;
 
       case 'field_media_file':
