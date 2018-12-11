@@ -16,6 +16,7 @@ use Drupal\jsonapi\ResourceType\ResourceType;
 use Drupal\jsonapi\ResourceType\ResourceTypeRepositoryInterface;
 use Drupal\user\Entity\User;
 use Symfony\Component\DependencyInjection\ContainerInterface;
+use Symfony\Component\Routing\Exception\RouteNotFoundException;
 
 /**
  * Controller for the API entry point.
@@ -112,13 +113,24 @@ class EntryPoint extends ControllerBase {
 
     $meta = [];
     if ($this->user->isAuthenticated()) {
-      $me_url = Url::fromRoute('jsonapi.user--user.individual', ['entity' => User::load($this->user->id())->uuid()])
-        ->setAbsolute()
-        ->toString(TRUE);
-      $meta['links']['me'] = ['href' => $me_url->getGeneratedUrl()];
-      // The cacheability of the `me` URL is the cacheability of that URL itself
-      // and the currently authenticated user.
-      $cacheability = $cacheability->merge($me_url)->addCacheContexts(['user']);
+      $current_user_uuid = User::load($this->user->id())->uuid();
+      $meta['links']['me'] = ['meta' => ['id' => $current_user_uuid]];
+      $cacheability->addCacheContexts(['user']);
+      try {
+        $me_url = Url::fromRoute(
+          'jsonapi.user--user.individual',
+          ['entity' => $current_user_uuid]
+        )
+          ->setAbsolute()
+          ->toString(TRUE);
+        $meta['links']['me']['href'] = $me_url->getGeneratedUrl();
+        // The cacheability of the `me` URL is the cacheability of that URL
+        // itself and the currently authenticated user.
+        $cacheability = $cacheability->merge($me_url);
+      }
+      catch (RouteNotFoundException $e) {
+        // Do not add the link if the route is disabled or marked as internal.
+      }
     }
 
     $response = new ResourceResponse(new JsonApiDocumentTopLevel(new EntityCollection([]), new NullEntityCollection(), $urls, $meta));
