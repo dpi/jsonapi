@@ -256,24 +256,7 @@ class FieldResolver {
     // This complex expression is needed to handle the string, "0", which would
     // otherwise be evaluated as FALSE.
     while (!is_null(($part = array_shift($parts)))) {
-      $field_name = $this->getInternalName($part, $resource_types);
-
-      // If none of the resource types are traversable, assume that the
-      // remaining path parts are targeting field deltas and/or field
-      // properties.
-      if (!$this->resourceTypesAreTraversable($resource_types)) {
-        $reference_breadcrumbs[] = $field_name === 'id' ? $this->getIdFieldName(reset($resource_types)) : $field_name;
-        return $this->constructInternalPath($reference_breadcrumbs, $parts);
-      }
-
-      // Different resource types have different field definitions.
-      $candidate_definitions = $this->getFieldItemDefinitions(
-        $resource_types,
-        $field_name
-      );
-
-      // If there are no definitions, then the field does not exist.
-      if (empty($candidate_definitions) && $field_name !== 'id') {
+      if (!$this->isMemberFilterable($part, $resource_types)) {
         throw new CacheableBadRequestHttpException($cacheability, sprintf(
           'Invalid nested filtering. The field `%s`, given in the path `%s`, does not exist.',
           $part,
@@ -281,8 +264,22 @@ class FieldResolver {
         ));
       }
 
+      $field_name = $this->getInternalName($part, $resource_types);
+
+      // If none of the resource types are traversable, assume that the
+      // remaining path parts are targeting field deltas and/or field
+      // properties.
+      if (!$this->resourceTypesAreTraversable($resource_types)) {
+        $reference_breadcrumbs[] = $field_name;
+        return $this->constructInternalPath($reference_breadcrumbs, $parts);
+      }
+
+      // Different resource types have different field definitions.
+      $candidate_definitions = $this->getFieldItemDefinitions($resource_types, $field_name);
+      assert(!empty($candidate_definitions));
+
       // We have a valid field, so add it to the validated trail of path parts.
-      $reference_breadcrumbs[] = $field_name === 'id' ? $this->getIdFieldName(reset($resource_types)) : $field_name;
+      $reference_breadcrumbs[] = $field_name;
 
       // Get all of the referenceable resource types.
       $resource_types = $this->getReferenceableResourceTypes($candidate_definitions);
@@ -428,9 +425,6 @@ class FieldResolver {
    */
   protected function getFieldItemDefinitions(array $resource_types, $field_name) {
     return array_reduce($resource_types, function ($result, ResourceType $resource_type) use ($field_name) {
-      if (!$resource_type->isFieldEnabled($field_name)) {
-        return $result;
-      }
       /* @var \Drupal\jsonapi\ResourceType\ResourceType $resource_type */
       $entity_type = $resource_type->getEntityTypeId();
       $bundle = $resource_type->getBundle();
@@ -473,8 +467,28 @@ class FieldResolver {
         // We already found the internal name.
         return $carry;
       }
-      return $resource_type->getInternalName($field_name);
+      return $field_name === 'id' ? $this->getIdFieldName($resource_type) : $resource_type->getInternalName($field_name);
     }, $field_name);
+  }
+
+  /**
+   * Determines if the given field or member name is filterable.
+   *
+   * @param string $external_name
+   *   The external field or member name.
+   * @param \Drupal\jsonapi\ResourceType\ResourceType[] $resource_types
+   *   The resource types to test.
+   *
+   * @return bool
+   *   Whether the given field is present as a filterable member of the targeted
+   *   resource objects.
+   */
+  protected function isMemberFilterable($external_name, array $resource_types) {
+    return array_reduce($resource_types, function ($carry, ResourceType $resource_type) use ($external_name) {
+      // @todo: remove the next line and uncomment the following on in https://www.drupal.org/project/jsonapi/issues/3017047.
+      return $carry ?: $external_name === 'id' || $resource_type->isFieldEnabled($resource_type->getInternalName($external_name));
+      /*return $carry ?: in_array($external_name, ['id', 'type']) || $resource_type->isFieldEnabled($resource_type->getInternalName($external_name));*/
+    }, FALSE);
   }
 
   /**

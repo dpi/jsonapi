@@ -64,6 +64,13 @@ class ResourceType {
   protected $isMutable;
 
   /**
+   * The list of fields on the underlying entity type + bundle.
+   *
+   * @var string[]
+   */
+  protected $fields;
+
+  /**
    * The list of disabled fields. Disabled by default: uuid, id, type.
    *
    * @var string[]
@@ -164,6 +171,27 @@ class ResourceType {
   }
 
   /**
+   * Checks if the field exists.
+   *
+   * Note: a minority of config entity types which do not define a
+   * `config_export` in their entity type annotation will not have their fields
+   * represented here because it is impossible to determine them without an
+   * instance of config available.
+   *
+   * @todo Refactor this in Drupal 9 if https://www.drupal.org/project/drupal/issues/2949021 lands, then `config_export` will be guaranteed to exist, and this won't need an instance anymore.
+   *
+   * @param string $field_name
+   *   The internal field name.
+   *
+   * @return bool
+   *   TRUE if the field is known to exist on the resource type; FALSE
+   *   otherwise.
+   */
+  public function hasField($field_name) {
+    return in_array($field_name, $this->fields, TRUE);
+  }
+
+  /**
    * Checks if a field is enabled or not.
    *
    * This is only here so we can allow polymorphic implementations to take a
@@ -173,11 +201,11 @@ class ResourceType {
    *   The internal field name.
    *
    * @return bool
-   *   TRUE if the field is enabled and should be considered as part of the data
-   *   model. FALSE otherwise.
+   *   TRUE if the field exists and is enabled and should be considered as part
+   *   of the data model. FALSE otherwise.
    */
   public function isFieldEnabled($field_name) {
-    return !in_array($field_name, $this->disabledFields, TRUE);
+    return $this->hasField($field_name) && !in_array($field_name, $this->disabledFields, TRUE);
   }
 
   /**
@@ -271,6 +299,7 @@ class ResourceType {
       ? 'unknown'
       : sprintf('%s--%s', $this->entityTypeId, $this->bundle);
 
+    $this->fields = array_keys($field_mapping);
     $this->disabledFields = array_keys(array_filter($field_mapping, function ($v) {
       return $v === FALSE;
     }));

@@ -11,6 +11,7 @@ use Drupal\Core\Url;
 use Drupal\field\Entity\FieldConfig;
 use Drupal\node\Entity\Node;
 use Drupal\node\Entity\NodeType;
+use Drupal\shortcut\Entity\Shortcut;
 use Drupal\taxonomy\Entity\Term;
 use Drupal\taxonomy\Entity\Vocabulary;
 use Drupal\user\Entity\Role;
@@ -590,6 +591,46 @@ class JsonApiRegressionTest extends JsonApiFunctionalTestBase {
     $response = $this->request('GET', $node_url, $request_options);
     $this->assertSame(200, $response->getStatusCode());
     $this->assertSame('HIT', $response->getHeader('X-Drupal-Cache')[0]);
+  }
+
+  /**
+   * Ensures that filtering by a sequential internal ID named 'id' is possible.
+   *
+   * @see https://www.drupal.org/project/jsonapi/issues/3015759
+   */
+  public function testFilterByIdFromIssue3015759() {
+    // Set up data model.
+    $this->assertTrue($this->container->get('module_installer')->install(['shortcut'], TRUE), 'Installed modules.');
+    $this->rebuildAll();
+
+    // Create data.
+    $shortcut = Shortcut::create([
+      'shortcut_set' => 'default',
+      'title' => $this->randomMachineName(),
+      'weight' => -20,
+      'link' => [
+        'uri' => 'internal:/user/logout',
+      ],
+    ]);
+    $shortcut->save();
+
+    // Test.
+    $user = $this->drupalCreateUser([
+      'access shortcuts',
+      'customize shortcut links',
+    ]);
+    $response = $this->request('GET', Url::fromUri('internal:/jsonapi/shortcut/default?filter[drupal_internal__id]=' . $shortcut->id()), [
+      RequestOptions::AUTH => [
+        $user->getUsername(),
+        $user->pass_raw,
+      ],
+    ]);
+    $this->assertSame(200, $response->getStatusCode());
+    $doc = Json::decode((string) $response->getBody());
+    $this->assertNotEmpty($doc['data']);
+    $this->assertSame($doc['data'][0]['id'], $shortcut->uuid());
+    $this->assertSame($doc['data'][0]['attributes']['drupal_internal__id'], (int) $shortcut->id());
+    $this->assertSame($doc['data'][0]['attributes']['title'], $shortcut->label());
   }
 
 }

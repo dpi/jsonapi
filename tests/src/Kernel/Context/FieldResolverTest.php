@@ -160,9 +160,9 @@ class FieldResolverTest extends JsonapiKernelTestBase {
   public function resolveInternalEntityQueryPathProvider() {
     return [
       'config entity as base' => [
-        'uuid', 'uuid', 'entity_test_bundle', 'entity_test_bundle',
+        'uuid', 'id', 'entity_test_bundle', 'entity_test_bundle',
       ],
-      'config entity as target' => ['type.entity:entity_test_bundle.uuid', 'type.uuid'],
+      'config entity as target' => ['type.entity:entity_test_bundle.uuid', 'type.id'],
 
       'primitive field; variation A' => ['field_test1', 'field_test1'],
       'primitive field; variation B' => ['field_test2', 'field_test2'],

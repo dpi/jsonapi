@@ -201,14 +201,19 @@ class ResourceTypeRepository implements ResourceTypeRepositoryInterface {
     // entities. By exposing all fields as attributes, we expose unwanted,
     // confusing or duplicate information:
     // - exposing an entity's ID (which is not a UUID) is bad, but it's
-    //   necessary for certain Drupal-coupled clients, so we alias it.
-    // - exposing its UUID as an attribute is useless (it's already part of
-    //   the mandatory "id" attribute in JSON:API)
+    //   necessary for certain Drupal-coupled clients, so we alias it by
+    //   prefixing it with `drupal_internal__`.
+    // - exposing an entity's UUID as an attribute is useless (it's already part
+    //   of the mandatory "id" attribute in JSON:API), so we disable it in most
+    //   cases.
     // - exposing its revision ID as an attribute will compete with any profile
     //   defined meta members used for resource object versioning.
     // @see http://jsonapi.org/format/#document-resource-identifier-objects
-    $mapping[$entity_type->getKey('uuid')] = FALSE;
     $id_field_name = $entity_type->getKey('id');
+    $uuid_field_name = $entity_type->getKey('uuid');
+    if ($uuid_field_name !== 'id') {
+      $mapping[$uuid_field_name] = FALSE;
+    }
     $mapping[$id_field_name] = "drupal_internal__$id_field_name";
     if ($entity_type->isRevisionable() && ($revision_id_field_name = $entity_type->getKey('revision'))) {
       $mapping[$revision_id_field_name] = "drupal_internal__$revision_id_field_name";

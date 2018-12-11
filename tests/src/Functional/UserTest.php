@@ -456,7 +456,7 @@ class UserTest extends ResourceTestBase {
   public function testQueryInvolvingRoles() {
     $this->setUpAuthorization('GET');
 
-    $collection_url = Url::fromRoute('jsonapi.user--user.collection', [], ['query' => ['filter[roles.uuid][value]' => 'e9b1de3f-9517-4c27-bef0-0301229de792']]);
+    $collection_url = Url::fromRoute('jsonapi.user--user.collection', [], ['query' => ['filter[roles.id][value]' => 'e9b1de3f-9517-4c27-bef0-0301229de792']]);
     $request_options = [];
     $request_options[RequestOptions::HEADERS]['Accept'] = 'application/vnd.api+json';
     $request_options = NestedArray::mergeDeep($request_options, $this->getAuthenticationRequestOptions());

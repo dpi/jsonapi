@@ -144,7 +144,7 @@ class EntityNormalizer extends NormalizerBase implements DenormalizerInterface {
     $bundle_key = $this->entityTypeManager->getDefinition($entity_type_id)
       ->getKey('bundle');
     if ($bundle_key && $bundle) {
-      $data[$bundle_key] = $bundle;
+      $data[$resource_type->getPublicName($bundle_key)] = $bundle;
     }
 
     return $this->entityTypeManager->getStorage($entity_type_id)
@@ -252,21 +252,17 @@ class EntityNormalizer extends NormalizerBase implements DenormalizerInterface {
 
     $entity_type_id = $resource_type->getEntityTypeId();
     $entity_type_definition = $this->entityTypeManager->getDefinition($entity_type_id);
-    $bundle_key = $entity_type_definition->getKey('bundle');
     $uuid_key = $entity_type_definition->getKey('uuid');
 
     // Translate the public fields into the entity fields.
     foreach ($data as $public_field_name => $field_value) {
       $internal_name = $resource_type->getInternalName($public_field_name);
 
-      // Skip any disabled field, except the always required bundle key and
-      // required-in-case-of-PATCHing uuid key.
+      // Fail for any disabled field unless it is the uuid key, which is
+      // disabled because it's transmitted as the `id` key of a resource object.
+      // However, for the purpose of denormalization, it exists in this array.
       // @see \Drupal\jsonapi\ResourceType\ResourceTypeRepository::getFieldMapping()
-      if (!$resource_type->isFieldEnabled($internal_name) && $bundle_key !== $internal_name && $uuid_key !== $internal_name) {
-        continue;
-      }
-
-      if (!isset($field_map[$internal_name]) || !in_array($resource_type->getBundle(), $field_map[$internal_name]['bundles'], TRUE)) {
+      if (!$resource_type->isFieldEnabled($internal_name) && $uuid_key !== $internal_name) {
         throw new UnprocessableEntityHttpException(sprintf(
           'The attribute %s does not exist on the %s resource type.',
           $internal_name,

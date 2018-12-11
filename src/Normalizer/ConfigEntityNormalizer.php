@@ -28,11 +28,13 @@ class ConfigEntityNormalizer extends EntityNormalizer {
   protected function getFields($entity, $bundle, ResourceType $resource_type) {
     $enabled_public_fields = [];
     $fields = $entity->toArray();
-    // Filter the array based on the field names.
-    $enabled_field_names = array_filter(
-      array_keys($fields),
-      [$resource_type, 'isFieldEnabled']
-    );
+    // Filter the array based on the field names. Some config entity types don't
+    // have a complete field mapping available and their fields can't be
+    // enabled or disabled. Thus this code should only filter out fields that
+    // are known to exist and are not enabled.
+    $enabled_field_names = array_filter(array_keys($fields), function ($field_name) use ($resource_type) {
+      return !$resource_type->hasField($field_name) || $resource_type->isFieldEnabled($field_name);
+    });
     // Return a sub-array of $output containing the keys in $enabled_fields.
     $input = array_intersect_key($fields, array_flip($enabled_field_names));
     /* @var \Drupal\Core\Config\Entity\ConfigEntityInterface $entity */
