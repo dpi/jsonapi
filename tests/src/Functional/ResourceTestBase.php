@@ -1751,6 +1751,10 @@ abstract class ResourceTestBase extends BrowserTestBase {
         $detail = 'The current user is not allowed to view this relationship.';
         if (!$entity->access('view') && $entity->access('view label') && $access instanceof AccessResultReasonInterface && empty($access->getReason())) {
           $access->setReason("The user only has authorization for the 'view label' operation.");
+          // @todo Remove when we stop supporting Drupal 8.5.
+          if (floatval(\Drupal::VERSION) < 8.6 && $relationship_field_name === 'roles' && static::$entityTypeId === 'user' && $access->getCacheContexts() === ['user.permissions']) {
+            $access = $access->setReason('');
+          }
         }
         $via_link = Url::fromRoute(
           sprintf('jsonapi.%s.%s.related', $base_resource_identifier['type'], $relationship_field_name),
