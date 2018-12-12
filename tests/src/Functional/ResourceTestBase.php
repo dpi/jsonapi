@@ -2351,6 +2351,10 @@ abstract class ResourceTestBase extends BrowserTestBase {
     // 204 for well-formed request.
     $response = $this->request('DELETE', $url, $request_options);
     $this->assertResourceResponse(204, NULL, $response);
+
+    // DX: 404 when non-existent.
+    $response = $this->request('DELETE', $url, $request_options);
+    $this->assertSame(404, $response->getStatusCode());
   }
 
   /**

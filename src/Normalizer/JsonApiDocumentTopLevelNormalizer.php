@@ -16,6 +16,7 @@ use Drupal\jsonapi\JsonApiResource\JsonApiDocumentTopLevel;
 use Drupal\jsonapi\ResourceType\ResourceType;
 use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
+use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Symfony\Component\HttpKernel\Exception\UnprocessableEntityHttpException;
 use Symfony\Component\Serializer\Normalizer\DenormalizerInterface;
 use Symfony\Component\Serializer\Normalizer\NormalizerInterface;
@@ -140,8 +141,12 @@ class JsonApiDocumentTopLevelNormalizer extends NormalizerBase implements Denorm
         // meta values from the relationship, whose deltas match with $id_list.
         $canonical_ids = [];
         foreach ($id_list as $delta => $uuid) {
-          if (empty($map[$uuid])) {
-            continue;
+          if (!isset($map[$uuid])) {
+            // @see \Drupal\jsonapi\Normalizer\EntityReferenceFieldNormalizer::normalize()
+            if ($uuid === 'virtual') {
+              continue;
+            }
+            throw new NotFoundHttpException(sprintf('The resource identified by `%s:%s` (given as a relationship item) could not be found.', $relationship['data'][$delta]['type'], $uuid));
           }
           $reference_item = [
             'target_id' => $map[$uuid],

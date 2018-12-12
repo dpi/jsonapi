@@ -24,6 +24,7 @@ use Prophecy\Argument;
 use Symfony\Component\HttpFoundation\ParameterBag;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
+use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 /**
  * @coversDefaultClass \Drupal\jsonapi\Normalizer\JsonApiDocumentTopLevelNormalizer
@@ -499,6 +500,7 @@ class JsonApiDocumentTopLevelNormalizerTest extends JsonapiKernelTestBase {
           [$this->term1->id()],
           $this->user2->id(),
         ],
+        'taxonomy_term--tags:invalid-uuid',
       ],
       // Bad data in user and first tag.
       [
@@ -510,6 +512,7 @@ class JsonApiDocumentTopLevelNormalizerTest extends JsonapiKernelTestBase {
           [$this->term1->id()],
           NULL,
         ],
+        'user--user:also-invalid-uuid',
       ],
     ];
 
@@ -519,11 +522,18 @@ class JsonApiDocumentTopLevelNormalizerTest extends JsonapiKernelTestBase {
 
       list($request, $resource_type) = $this->generateProphecies('node', 'article');
       $this->container->get('request_stack')->push($request);
-      $node = $this
-        ->getNormalizer()
-        ->denormalize(Json::decode($payload), NULL, 'api_json', [
-          'resource_type' => $resource_type,
-        ]);
+      try {
+        $node = $this
+          ->getNormalizer()
+          ->denormalize(Json::decode($payload), NULL, 'api_json', [
+            'resource_type' => $resource_type,
+          ]);
+      }
+      catch (NotFoundHttpException $e) {
+        $non_existing_resource_identifier = $configuration[2];
+        $this->assertEquals("The resource identified by `$non_existing_resource_identifier` (given as a relationship item) could not be found.", $e->getMessage());
+        continue;
+      }
 
       /* @var \Drupal\node\Entity\Node $node */
       $this->assertInstanceOf('\Drupal\node\Entity\Node', $node);

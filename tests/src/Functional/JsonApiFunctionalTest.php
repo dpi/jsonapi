@@ -530,12 +530,6 @@ class JsonApiFunctionalTest extends JsonApiFunctionalTestBase {
           ],
         ],
         'relationships' => [
-          'type' => [
-            'data' => [
-              'type' => 'node_type--node_type',
-              'id' => 'article',
-            ],
-          ],
           'field_tags' => [
             'data' => [
               [
@@ -618,8 +612,7 @@ class JsonApiFunctionalTest extends JsonApiFunctionalTestBase {
       'headers' => ['Content-Type' => 'application/vnd.api+json'],
     ]);
     $created_response = Json::decode($response->getBody()->__toString());
-    $this->assertEquals(201, $response->getStatusCode());
-    $this->assertEquals(0, count($created_response['data']['relationships']['field_tags']['data']));
+    $this->assertEquals(404, $response->getStatusCode());
     // 6. Decoding error.
     $response = $this->request('POST', $collection_url, [
       'body' => '{"bad json",,,}',

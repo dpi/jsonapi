@@ -344,4 +344,46 @@ class NodeTest extends ResourceTestBase {
     ];
   }
 
+  /**
+   * Creating relationships to missing resources should be 404 per JSON:API 1.1.
+   *
+   * @see https://github.com/json-api/json-api/issues/1033
+   */
+  public function testPostNonExistingAuthor() {
+    $this->setUpAuthorization('POST');
+    $this->grantPermissionsToTestedRole(['administer nodes']);
+
+    $random_uuid = \Drupal::service('uuid')->generate();
+    $doc = $this->getPostDocument();
+    $doc['data']['relationships']['uid']['data'] = [
+      'type' => 'user--user',
+      'id' => $random_uuid,
+    ];
+
+    // Create node POST request.
+    $url = Url::fromRoute(sprintf('jsonapi.%s.collection.post', static::$resourceTypeName));
+    $request_options = $this->getAuthenticationRequestOptions();
+    $request_options[RequestOptions::HEADERS]['Accept'] = 'application/vnd.api+json';
+    $request_options[RequestOptions::HEADERS]['Content-Type'] = 'application/vnd.api+json';
+    $request_options[RequestOptions::BODY] = Json::encode($doc);
+
+    // POST request: 404 when adding relationships to non-existing resources.
+    $response = $this->request('POST', $url, $request_options);
+    $expected_document = [
+      'errors' => [
+        0 => [
+          'status' => 404,
+          'title' => 'Not Found',
+          'detail' => "The resource identified by `user--user:$random_uuid` (given as a relationship item) could not be found.",
+          'links' => [
+            'info' => ['href' => HttpExceptionNormalizer::getInfoUrl(404)],
+            'via' => ['href' => $url->setAbsolute()->toString()],
+          ],
+        ],
+      ],
+      'jsonapi' => static::$jsonApiMember,
+    ];
+    $this->assertResourceResponse(404, $expected_document, $response);
+  }
+
 }
