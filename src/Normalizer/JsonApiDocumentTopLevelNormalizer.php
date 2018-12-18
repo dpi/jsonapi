@@ -4,7 +4,6 @@ namespace Drupal\jsonapi\Normalizer;
 
 use Drupal\Component\Plugin\Exception\PluginNotFoundException;
 use Drupal\Component\Uuid\Uuid;
-use Drupal\Core\Access\AccessResult;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Field\EntityReferenceFieldItemListInterface;
 use Drupal\jsonapi\Exception\EntityAccessDeniedHttpException;
@@ -236,9 +235,7 @@ class JsonApiDocumentTopLevelNormalizer extends NormalizerBase implements Denorm
     }
     // Ensure that the client provided ID is a valid UUID.
     if (isset($document['data']['id']) && !Uuid::isValid($document['data']['id'])) {
-      // This should be a 422 response, but the JSON:API specification dictates
-      // a 403 Forbidden response. We follow the specification.
-      throw new EntityAccessDeniedHttpException(NULL, AccessResult::forbidden(), '/data/id', 'IDs should be properly generated and formatted UUIDs as described in RFC 4122.');
+      throw new UnprocessableEntityHttpException('IDs should be properly generated and formatted UUIDs as described in RFC 4122.');
     }
     // Ensure that no relationship fields are being set via the attributes
     // resource object member.

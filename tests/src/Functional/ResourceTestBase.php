@@ -29,7 +29,6 @@ use Drupal\jsonapi\JsonApiResource\NullEntityCollection;
 use Drupal\jsonapi\Normalizer\HttpExceptionNormalizer;
 use Drupal\jsonapi\JsonApiResource\JsonApiDocumentTopLevel;
 use Drupal\jsonapi\ResourceResponse;
-use Drupal\jsonapi\Serializer\Serializer;
 use Drupal\path\Plugin\Field\FieldType\PathItem;
 use Drupal\Tests\BrowserTestBase;
 use Drupal\user\Entity\Role;
@@ -911,25 +910,8 @@ abstract class ResourceTestBase extends BrowserTestBase {
     if (!static::$anonymousUsersCanViewLabels) {
       $expected_403_cacheability = $this->getExpectedUnauthorizedAccessCacheability();
       $reason = $this->getExpectedUnauthorizedAccessMessage('GET');
-      // @todo Remove $expected + assertResourceResponse() in favor of the commented line below once https://www.drupal.org/project/jsonapi/issues/2943176 lands.
-      $expected_document = [
-        'jsonapi' => static::$jsonApiMember,
-        'errors' => [
-          [
-            'title' => 'Forbidden',
-            'status' => 403,
-            'detail' => "The current user is not allowed to GET the selected resource." . (strlen($reason) ? ' ' . $reason : ''),
-            'links' => [
-              'info' => ['href' => HttpExceptionNormalizer::getInfoUrl(403)],
-              'via' => ['href' => $url->setAbsolute()->toString()],
-            ],
-            'source' => [
-              'pointer' => '/data',
-            ],
-          ],
-        ],
-      ];
-      $this->assertResourceResponse(403, $expected_document, $response, $expected_403_cacheability->getCacheTags(), $expected_403_cacheability->getCacheContexts(), FALSE, 'MISS');
+      $message = trim("The current user is not allowed to GET the selected resource. $reason");
+      $this->assertResourceErrorResponse(403, $message, $url, $response, '/data', $expected_403_cacheability->getCacheTags(), $expected_403_cacheability->getCacheContexts(), FALSE, 'MISS');
       $this->assertArrayNotHasKey('Link', $response->getHeaders());
     }
     else {
@@ -1880,31 +1862,11 @@ abstract class ResourceTestBase extends BrowserTestBase {
 
     $request_options[RequestOptions::BODY] = $parseable_invalid_request_body_2;
 
-    // @todo Uncomment when https://www.drupal.org/project/jsonapi/issues/2934386 lands.
     // DX: 403 when invalid entity: UUID field too long.
     // @todo Fix this in https://www.drupal.org/node/2149851.
     if ($this->entity->getEntityType()->hasKey('uuid')) {
       $response = $this->request('POST', $url, $request_options);
-      // @todo Remove $expected + assertResourceResponse() in favor of the commented line below once https://www.drupal.org/project/jsonapi/issues/2943176 lands.
-      $expected_document = [
-        'jsonapi' => static::$jsonApiMember,
-        'errors' => [
-          [
-            'title' => 'Forbidden',
-            'status' => 403,
-            'detail' => "IDs should be properly generated and formatted UUIDs as described in RFC 4122.",
-            'links' => [
-              'info' => ['href' => HttpExceptionNormalizer::getInfoUrl(403)],
-              'via' => ['href' => $url->setAbsolute()->toString()],
-            ],
-            'source' => [
-              'pointer' => '/data/id',
-            ],
-          ],
-        ],
-      ];
-      $this->assertResourceResponse(403, $expected_document, $response);
-      /* $this->assertResourceErrorResponse(403, "IDs should be properly generated and formatted UUIDs as described in RFC 4122.", $response, '/data/id'); */
+      $this->assertResourceErrorResponse(422, "IDs should be properly generated and formatted UUIDs as described in RFC 4122.", $url, $response);
     }
 
     $request_options[RequestOptions::BODY] = $parseable_invalid_request_body_3;
