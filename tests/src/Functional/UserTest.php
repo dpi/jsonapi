@@ -5,7 +5,10 @@ namespace Drupal\Tests\jsonapi\Functional;
 use Drupal\Component\Serialization\Json;
 use Drupal\Component\Utility\NestedArray;
 use Drupal\Core\Url;
+use Drupal\field\Entity\FieldConfig;
+use Drupal\field\Entity\FieldStorageConfig;
 use Drupal\jsonapi\Normalizer\HttpExceptionNormalizer;
+use Drupal\node\Entity\Node;
 use Drupal\user\Entity\User;
 use GuzzleHttp\RequestOptions;
 
@@ -463,6 +466,9 @@ class UserTest extends ResourceTestBase {
     $request_options[RequestOptions::HEADERS]['Accept'] = 'application/vnd.api+json';
     $request_options = NestedArray::mergeDeep($request_options, $this->getAuthenticationRequestOptions());
 
+    // The 'administer users' permission is required to filter by role entities.
+    $this->grantPermissionsToTestedRole(['administer users']);
+
     $response = $this->request('GET', $collection_url, $request_options);
     $this->assertResourceErrorResponse(400, "Filtering on config entities is not supported by Drupal's entity API. You tried to filter on a Role config entity.", $collection_url, $response, FALSE, ['4xx-response', 'http_response'], ['url.path', 'url.query_args:filter'], FALSE, 'MISS');
   }
@@ -482,6 +488,113 @@ class UserTest extends ResourceTestBase {
     $this->assertCount(4, $doc['data']);
     $this->assertSame(User::load(0)->uuid(), $doc['data'][0]['id']);
     $this->assertSame('Anonymous', $doc['data'][0]['attributes']['name']);
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function testCollectionFilterAccess() {
+    // Set up data model.
+    $this->assertTrue($this->container->get('module_installer')->install(['node'], TRUE), 'Installed modules.');
+    FieldStorageConfig::create([
+      'entity_type' => static::$entityTypeId,
+      'field_name' => 'field_favorite_animal',
+      'type' => 'string',
+    ])
+      ->setCardinality(1)
+      ->save();
+    FieldConfig::create([
+      'entity_type' => static::$entityTypeId,
+      'field_name' => 'field_favorite_animal',
+      'bundle' => 'user',
+    ])
+      ->setLabel('Test field')
+      ->setTranslatable(FALSE)
+      ->save();
+    $this->drupalCreateContentType(['type' => 'x']);
+    $this->rebuildAll();
+    $this->grantPermissionsToTestedRole(['access content']);
+
+    // Create data.
+    $user_a = User::create([])->setUsername('A')->activate();
+    $user_a->save();
+    $user_b = User::create([])->setUsername('B')->set('field_favorite_animal', 'stegosaurus')->block();
+    $user_b->save();
+    $node_a = Node::create(['type' => 'x'])->setTitle('Owned by A')->setOwner($user_a);
+    $node_a->save();
+    $node_b = Node::create(['type' => 'x'])->setTitle('Owned by B')->setOwner($user_b);
+    $node_b->save();
+    $node_anon_1 = Node::create(['type' => 'x'])->setTitle('Owned by anon #1')->setOwnerId(0);
+    $node_anon_1->save();
+    $node_anon_2 = Node::create(['type' => 'x'])->setTitle('Owned by anon #2')->setOwnerId(0);
+    $node_anon_2->save();
+    $node_auth_1 = Node::create(['type' => 'x'])->setTitle('Owned by auth #1')->setOwner($this->account);
+    $node_auth_1->save();
+
+    $favorite_animal_test_url = Url::fromRoute('jsonapi.user--user.collection')->setOption('query', ['filter[field_favorite_animal]' => 'stegosaurus']);
+
+    // Test.
+    $collection_url = Url::fromRoute('jsonapi.node--x.collection');
+    $request_options = [];
+    $request_options[RequestOptions::HEADERS]['Accept'] = 'application/vnd.api+json';
+    $request_options = NestedArray::mergeDeep($request_options, $this->getAuthenticationRequestOptions());
+    // ?filter[uid.id]=OWN_UUID requires no permissions: 1 result.
+    $response = $this->request('GET', $collection_url->setOption('query', ['filter[uid.id]' => $this->account->uuid()]), $request_options);
+    $this->assertSession()->responseHeaderContains('X-Drupal-Cache-Contexts', 'user.permissions');
+    $doc = Json::decode((string) $response->getBody());
+    $this->assertCount(1, $doc['data']);
+    $this->assertSame($node_auth_1->uuid(), $doc['data'][0]['id']);
+    // ?filter[uid.id]=ANONYMOUS_UUID: 0 results.
+    $response = $this->request('GET', $collection_url->setOption('query', ['filter[uid.id]' => User::load(0)->uuid()]), $request_options);
+    $this->assertSession()->responseHeaderContains('X-Drupal-Cache-Contexts', 'user.permissions');
+    $doc = Json::decode((string) $response->getBody());
+    $this->assertCount(0, $doc['data']);
+    // ?filter[uid.name]=A: 0 results.
+    $response = $this->request('GET', $collection_url->setOption('query', ['filter[uid.name]' => 'A']), $request_options);
+    $doc = Json::decode((string) $response->getBody());
+    $this->assertCount(0, $doc['data']);
+    // /jsonapi/user/user?filter[field_favorite_animal]: 0 results.
+    $response = $this->request('GET', $favorite_animal_test_url, $request_options);
+    $this->assertSame(200, $response->getStatusCode());
+    $doc = Json::decode((string) $response->getBody());
+    $this->assertCount(0, $doc['data']);
+    // Grant "view" permission.
+    $this->grantPermissionsToTestedRole(['access user profiles']);
+    // ?filter[uid.id]=ANONYMOUS_UUID: 0 results.
+    $response = $this->request('GET', $collection_url->setOption('query', ['filter[uid.id]' => User::load(0)->uuid()]), $request_options);
+    $this->assertSession()->responseHeaderContains('X-Drupal-Cache-Contexts', 'user.permissions');
+    $doc = Json::decode((string) $response->getBody());
+    $this->assertCount(0, $doc['data']);
+    // ?filter[uid.name]=A: 1 result since user A is active.
+    $response = $this->request('GET', $collection_url->setOption('query', ['filter[uid.name]' => 'A']), $request_options);
+    $this->assertSession()->responseHeaderContains('X-Drupal-Cache-Contexts', 'user.permissions');
+    $doc = Json::decode((string) $response->getBody());
+    $this->assertCount(1, $doc['data']);
+    $this->assertSame($node_a->uuid(), $doc['data'][0]['id']);
+    // ?filter[uid.name]=B: 0 results since user B is blocked.
+    $response = $this->request('GET', $collection_url->setOption('query', ['filter[uid.name]' => 'B']), $request_options);
+    $this->assertSession()->responseHeaderContains('X-Drupal-Cache-Contexts', 'user.permissions');
+    $doc = Json::decode((string) $response->getBody());
+    $this->assertCount(0, $doc['data']);
+    // /jsonapi/user/user?filter[field_favorite_animal]: 0 results.
+    $response = $this->request('GET', $favorite_animal_test_url, $request_options);
+    $this->assertSame(200, $response->getStatusCode());
+    $doc = Json::decode((string) $response->getBody());
+    $this->assertCount(0, $doc['data']);
+    // Grant "admin" permission.
+    $this->grantPermissionsToTestedRole(['administer users']);
+    // ?filter[uid.name]=B: 1 result.
+    $response = $this->request('GET', $collection_url->setOption('query', ['filter[uid.name]' => 'B']), $request_options);
+    $this->assertSession()->responseHeaderContains('X-Drupal-Cache-Contexts', 'user.permissions');
+    $doc = Json::decode((string) $response->getBody());
+    $this->assertCount(1, $doc['data']);
+    $this->assertSame($node_b->uuid(), $doc['data'][0]['id']);
+    // /jsonapi/user/user?filter[field_favorite_animal]: 1 result.
+    $response = $this->request('GET', $favorite_animal_test_url, $request_options);
+    $this->assertSame(200, $response->getStatusCode());
+    $doc = Json::decode((string) $response->getBody());
+    $this->assertCount(1, $doc['data']);
+    $this->assertSame($user_b->uuid(), $doc['data'][0]['id']);
   }
 
 }

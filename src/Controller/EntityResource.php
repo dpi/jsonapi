@@ -17,6 +17,7 @@ use Drupal\Core\Field\FieldDefinitionInterface;
 use Drupal\Core\Field\FieldItemListInterface;
 use Drupal\Core\Render\RenderContext;
 use Drupal\Core\Render\RendererInterface;
+use Drupal\jsonapi\Access\TemporaryQueryGuard;
 use Drupal\jsonapi\Exception\EntityAccessDeniedHttpException;
 use Drupal\jsonapi\Exception\UnprocessableHttpEntityException;
 use Drupal\jsonapi\IncludeResolver;
@@ -337,10 +338,9 @@ class EntityResource {
     // Instantiate the query for the filtering.
     $entity_type_id = $resource_type->getEntityTypeId();
 
-    $route_params = $request->attributes->get('_route_params');
-    $params = isset($route_params['_json_api_params']) ? $route_params['_json_api_params'] : [];
-    $query = $this->getCollectionQuery($resource_type, $params);
+    $params = static::getJsonApiParams($request, $resource_type);
     $query_cacheability = new CacheableMetadata();
+    $query = $this->getCollectionQuery($resource_type, $params, $query_cacheability);
 
     try {
       $results = $this->executeQueryInRenderContext(
@@ -379,7 +379,7 @@ class EntityResource {
     // Calculate all the results and pass them to the EntityCollectionInterface.
     $count_query_cacheability = new CacheableMetadata();
     if ($resource_type->includeCount()) {
-      $count_query = $this->getCollectionCountQuery($resource_type, $params);
+      $count_query = $this->getCollectionCountQuery($resource_type, $params, $count_query_cacheability);
       $total_results = $this->executeQueryInRenderContext(
         $count_query,
         $count_query_cacheability
@@ -719,11 +719,13 @@ class EntityResource {
    *   The base JSON:API resource type for the query.
    * @param array $params
    *   The parameters for the query.
+   * @param \Drupal\Core\Cache\CacheableMetadata $query_cacheability
+   *   Collects cacheability for the query.
    *
    * @return \Drupal\Core\Entity\Query\QueryInterface
    *   A new query.
    */
-  protected function getCollectionQuery(ResourceType $resource_type, array $params) {
+  protected function getCollectionQuery(ResourceType $resource_type, array $params, CacheableMetadata $query_cacheability) {
     $entity_type = $this->entityTypeManager->getDefinition($resource_type->getEntityTypeId());
     $entity_storage = $this->entityTypeManager->getStorage($resource_type->getEntityTypeId());
 
@@ -735,6 +737,9 @@ class EntityResource {
     // Compute and apply an entity query condition from the filter parameter.
     if (isset($params[Filter::KEY_NAME]) && $filter = $params[Filter::KEY_NAME]) {
       $query->condition($filter->queryCondition($query));
+      TemporaryQueryGuard::setFieldManager($this->fieldManager);
+      TemporaryQueryGuard::setModuleHandler(\Drupal::moduleHandler());
+      TemporaryQueryGuard::applyAccessControls($filter, $query, $query_cacheability);
     }
 
     // Apply any sorts to the entity query.
@@ -776,13 +781,15 @@ class EntityResource {
    *   The base JSON:API resource type for the query.
    * @param array $params
    *   The parameters for the query.
+   * @param \Drupal\Core\Cache\CacheableMetadata $query_cacheability
+   *   Collects cacheability for the query.
    *
    * @return \Drupal\Core\Entity\Query\QueryInterface
    *   A new query.
    */
-  protected function getCollectionCountQuery(ResourceType $resource_type, array $params) {
+  protected function getCollectionCountQuery(ResourceType $resource_type, array $params, CacheableMetadata $query_cacheability) {
     // Reset the range to get all the available results.
-    return $this->getCollectionQuery($resource_type, $params)->range()->count();
+    return $this->getCollectionQuery($resource_type, $params, $query_cacheability)->range()->count();
   }
 
   /**
@@ -1063,6 +1070,28 @@ class EntityResource {
     return !empty($entity_storage->loadByProperties([
       'uuid' => $entity->uuid(),
     ]));
+  }
+
+  /**
+   * Extracts JSON:API query parameters from the request.
+   *
+   * @param \Symfony\Component\HttpFoundation\Request $request
+   *   The request object.
+   * @param \Drupal\jsonapi\ResourceType\ResourceType $resource_type
+   *   The current JSON:API resoure type.
+   *
+   * @return array
+   *   An array of JSON:API parameters like `sort` and `filter`.
+   */
+  protected static function getJsonApiParams(Request $request, ResourceType $resource_type) {
+    $route_params = $request->attributes->get('_route_params');
+    $params = isset($route_params['_json_api_params']) ? $route_params['_json_api_params'] : [];
+    if ($request->query->has('filter')) {
+      $serializer = \Drupal::service('jsonapi.serializer_do_not_use_removal_imminent');
+      $context = ['entity_type_id' => $resource_type->getEntityTypeId(), 'bundle' => $resource_type->getBundle()];
+      $params[Filter::KEY_NAME] = $serializer->denormalize($request->query->get('filter'), Filter::class, NULL, $context);
+    }
+    return $params;
   }
 
 }

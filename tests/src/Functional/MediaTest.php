@@ -7,6 +7,7 @@ use Drupal\Core\Url;
 use Drupal\file\Entity\File;
 use Drupal\media\Entity\Media;
 use Drupal\media\Entity\MediaType;
+use Drupal\Tests\jsonapi\Traits\CommonCollectionFilterAccessTestPatternsTrait;
 use Drupal\user\Entity\User;
 
 /**
@@ -15,6 +16,8 @@ use Drupal\user\Entity\User;
  * @group jsonapi
  */
 class MediaTest extends ResourceTestBase {
+
+  use CommonCollectionFilterAccessTestPatternsTrait;
 
   /**
    * {@inheritdoc}
@@ -357,6 +360,13 @@ class MediaTest extends ResourceTestBase {
   protected function doTestRelationshipMutation(array $request_options) {
     $this->grantPermissionsToTestedRole(['access content']);
     parent::doTestRelationshipMutation($request_options);
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function testCollectionFilterAccess() {
+    $this->doTestCollectionFilterAccessForPublishableEntities('name', 'view media', 'administer media');
   }
 
 }

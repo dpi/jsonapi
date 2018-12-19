@@ -4,6 +4,7 @@ namespace Drupal\Tests\jsonapi\Functional;
 
 use Drupal\aggregator\Entity\Feed;
 use Drupal\Core\Url;
+use Drupal\Tests\jsonapi\Traits\CommonCollectionFilterAccessTestPatternsTrait;
 
 /**
  * JSON:API integration test for the "Feed" content entity type.
@@ -11,6 +12,8 @@ use Drupal\Core\Url;
  * @group jsonapi
  */
 class FeedTest extends ResourceTestBase {
+
+  use CommonCollectionFilterAccessTestPatternsTrait;
 
   /**
    * {@inheritdoc}
@@ -167,6 +170,13 @@ class FeedTest extends ResourceTestBase {
       case 'DELETE':
         return "The 'administer news feeds' permission is required.";
     }
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function testCollectionFilterAccess() {
+    $this->doTestCollectionFilterAccessBasedOnPermissions('title', 'access news feeds');
   }
 
 }

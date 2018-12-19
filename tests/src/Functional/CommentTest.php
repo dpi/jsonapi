@@ -12,6 +12,7 @@ use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Session\AccountInterface;
 use Drupal\Core\Url;
 use Drupal\entity_test\Entity\EntityTest;
+use Drupal\Tests\jsonapi\Traits\CommonCollectionFilterAccessTestPatternsTrait;
 use Drupal\user\Entity\User;
 use GuzzleHttp\RequestOptions;
 
@@ -23,6 +24,7 @@ use GuzzleHttp\RequestOptions;
 class CommentTest extends ResourceTestBase {
 
   use CommentTestTrait;
+  use CommonCollectionFilterAccessTestPatternsTrait;
 
   /**
    * {@inheritdoc}
@@ -407,6 +409,49 @@ class CommentTest extends ResourceTestBase {
       'type' => ['administer comment types'],
       'uid' => ['access user profiles'],
     ];
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function testCollectionFilterAccess() {
+    // Verify the expected behavior in the common case.
+    $this->doTestCollectionFilterAccessForPublishableEntities('subject', 'access comments', 'administer comments');
+
+    $collection_url = Url::fromRoute('jsonapi.entity_test--bar.collection');
+    $request_options = [];
+    $request_options[RequestOptions::HEADERS]['Accept'] = 'application/vnd.api+json';
+    $request_options = NestedArray::mergeDeep($request_options, $this->getAuthenticationRequestOptions());
+
+    // Go back to a simpler scenario: revoke the admin permission, publish the
+    // comment and uninstall the query access test module.
+    $this->revokePermissionsFromTestedRole(['administer comments']);
+    $this->entity->setPublished()->save();
+    $this->assertTrue($this->container->get('module_installer')->uninstall(['jsonapi_test_field_filter_access'], TRUE), 'Uninstalled modules.');
+    // ?filter[spotlight.LABEL]: 1 result. Just as already tested above in
+    // ::doTestCollectionFilterAccessForPublishableEntities().
+    $collection_filter_url = $collection_url->setOption('query', ["filter[spotlight.subject]" => $this->entity->label()]);
+    $response = $this->request('GET', $collection_filter_url, $request_options);
+    $doc = Json::decode((string) $response->getBody());
+    $this->assertCount(1, $doc['data']);
+    // Mark the commented entity as inaccessible.
+    \Drupal::state()->set('jsonapi__entity_test_filter_access_blacklist', [$this->entity->getCommentedEntityId()]);
+    Cache::invalidateTags(['state:jsonapi__entity_test_filter_access_blacklist']);
+    // ?filter[spotlight.LABEL]: 0 results.
+    $response = $this->request('GET', $collection_filter_url, $request_options);
+    $doc = Json::decode((string) $response->getBody());
+    $this->assertCount(0, $doc['data']);
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  protected static function getExpectedCollectionCacheability(array $collection, array $sparse_fieldset = NULL, AccountInterface $account, $filtered = FALSE) {
+    $cacheability = parent::getExpectedCollectionCacheability($collection, $sparse_fieldset, $account, $filtered);
+    if ($filtered) {
+      $cacheability->addCacheTags(['state:jsonapi__entity_test_filter_access_blacklist']);
+    }
+    return $cacheability;
   }
 
 }

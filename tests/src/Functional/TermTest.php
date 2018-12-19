@@ -10,6 +10,7 @@ use Drupal\Core\Url;
 use Drupal\jsonapi\ResourceResponse;
 use Drupal\taxonomy\Entity\Term;
 use Drupal\taxonomy\Entity\Vocabulary;
+use Drupal\Tests\jsonapi\Traits\CommonCollectionFilterAccessTestPatternsTrait;
 use GuzzleHttp\RequestOptions;
 
 /**
@@ -18,6 +19,8 @@ use GuzzleHttp\RequestOptions;
  * @group jsonapi
  */
 class TermTest extends ResourceTestBase {
+
+  use CommonCollectionFilterAccessTestPatternsTrait;
 
   /**
    * {@inheritdoc}
@@ -494,6 +497,18 @@ class TermTest extends ResourceTestBase {
         [3, 2],
       ],
     ];
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function testCollectionFilterAccess() {
+    if (floatval(\Drupal::VERSION) >= 8.6) {
+      $this->doTestCollectionFilterAccessForPublishableEntities('name', 'access content', 'administer taxonomy');
+    }
+    else {
+      $this->doTestCollectionFilterAccessBasedOnPermissions('name', 'access content');
+    }
   }
 
 }

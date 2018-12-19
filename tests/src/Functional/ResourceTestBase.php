@@ -504,11 +504,13 @@ abstract class ResourceTestBase extends BrowserTestBase {
    * @param \Drupal\Core\Session\AccountInterface $account
    *   An account for which cacheability should be computed (cacheability is
    *   dependent on access).
+   * @param bool $filtered
+   *   Whether the collection is filtered or not.
    *
    * @return \Drupal\Core\Cache\CacheableMetadata
    *   The expected cacheability for the given entity collection.
    */
-  protected static function getExpectedCollectionCacheability(array $collection, array $sparse_fieldset = NULL, AccountInterface $account) {
+  protected static function getExpectedCollectionCacheability(array $collection, array $sparse_fieldset = NULL, AccountInterface $account, $filtered = FALSE) {
     $cacheability = array_reduce($collection, function (CacheableMetadata $cacheability, EntityInterface $entity) use ($sparse_fieldset, $account) {
       $access_result = static::entityAccess($entity, 'view', $account);
       if (!$access_result->isAllowed()) {
@@ -599,6 +601,20 @@ abstract class ResourceTestBase extends BrowserTestBase {
    */
   protected function grantPermissionsToTestedRole(array $permissions) {
     $this->grantPermissions(Role::load(RoleInterface::AUTHENTICATED_ID), $permissions);
+  }
+
+  /**
+   * Revokes permissions from the authenticated role.
+   *
+   * @param string[] $permissions
+   *   Permissions to revoke.
+   */
+  protected function revokePermissionsFromTestedRole(array $permissions) {
+    $role = Role::load(RoleInterface::AUTHENTICATED_ID);
+    foreach ($permissions as $permission) {
+      $role->revokePermission($permission);
+    }
+    $role->trustData()->save();
   }
 
   /**
@@ -1085,6 +1101,36 @@ abstract class ResourceTestBase extends BrowserTestBase {
     $dynamic_cache = $dynamic_cache === 'UNCACHEABLE' ? 'UNCACHEABLE' : 'HIT';
     $this->assertResourceResponse(200, $expected_document, $response, $expected_cacheability->getCacheTags(), $expected_cacheability->getCacheContexts(), FALSE, $dynamic_cache);
 
+    if ($this->entity instanceof FieldableEntityInterface) {
+      // 403 for filtering on an unauthorized field on the base resource type.
+      $unauthorized_filter_url = clone $collection_url;
+      $unauthorized_filter_url->setOption('query', [
+        'filter' => [
+          'related_author_id' => [
+            'operator' => '<>',
+            'path' => 'field_jsonapi_test_entity_ref.mail',
+            'value' => 'doesnt@matter.com',
+          ],
+        ],
+      ]);
+      $response = $this->request('GET', $unauthorized_filter_url, $request_options);
+      $expected_error_message = "The current user is not authorized to filter by the `field_jsonapi_test_entity_ref` field, given in the path `field_jsonapi_test_entity_ref`. The 'field_jsonapi_test_entity_ref view access' permission is required.";
+      $expected_cache_tags = ['4xx-response', 'http_response'];
+      $expected_cache_contexts = [
+        'url.query_args:filter',
+        'url.query_args:sort',
+        'user.permissions',
+      ];
+      $this->assertResourceErrorResponse(403, $expected_error_message, $unauthorized_filter_url, $response, FALSE, $expected_cache_tags, $expected_cache_contexts, FALSE, 'MISS');
+
+      $this->grantPermissionsToTestedRole(['field_jsonapi_test_entity_ref view access']);
+
+      // 403 for filtering on an unauthorized field on a related resource type.
+      $response = $this->request('GET', $unauthorized_filter_url, $request_options);
+      $expected_error_message = "The current user is not authorized to filter by the `mail` field, given in the path `field_jsonapi_test_entity_ref.entity:user.mail`.";
+      $this->assertResourceErrorResponse(403, $expected_error_message, $unauthorized_filter_url, $response, FALSE, $expected_cache_tags, $expected_cache_contexts, FALSE, 'MISS');
+    }
+
     // Remove an entity from the collection, then filter it out.
     $filtered_entity_collection = $entity_collection;
     $removed = array_shift($filtered_entity_collection);
@@ -1101,12 +1147,12 @@ abstract class ResourceTestBase extends BrowserTestBase {
       ],
     ];
     $filtered_collection_url->setOption('query', $entity_collection_filter);
-    $expected_response = $this->getExpectedCollectionResponse($filtered_entity_collection, $filtered_collection_url->toString(), $request_options);
+    $expected_response = $this->getExpectedCollectionResponse($filtered_entity_collection, $filtered_collection_url->toString(), $request_options, NULL, TRUE);
     $expected_cacheability = $expected_response->getCacheableMetadata();
     $expected_document = $expected_response->getResponseData();
     $response = $this->request('GET', $filtered_collection_url, $request_options);
     // MISS or UNCACHEABLE depends on the collection data. It must not be HIT.
-    $dynamic_cache = $expected_cacheability->getCacheMaxAge() === 0 ? 'UNCACHEABLE' : 'MISS';
+    $dynamic_cache = $expected_cacheability->getCacheMaxAge() === 0 || !empty(array_intersect(['user', 'session'], $expected_cacheability->getCacheContexts())) ? 'UNCACHEABLE' : 'MISS';
     $this->assertResourceResponse(200, $expected_document, $response, $expected_cacheability->getCacheTags(), $expected_cacheability->getCacheContexts(), FALSE, $dynamic_cache);
 
     // Filtered collection with includes.
@@ -1116,13 +1162,13 @@ abstract class ResourceTestBase extends BrowserTestBase {
     $include = ['include' => implode(',', $relationship_field_names)];
     $filtered_collection_include_url = clone $collection_url;
     $filtered_collection_include_url->setOption('query', array_merge($entity_collection_filter, $include));
-    $expected_response = $this->getExpectedCollectionResponse($filtered_entity_collection, $filtered_collection_include_url->toString(), $request_options, $relationship_field_names);
+    $expected_response = $this->getExpectedCollectionResponse($filtered_entity_collection, $filtered_collection_include_url->toString(), $request_options, $relationship_field_names, TRUE);
     $expected_cacheability = $expected_response->getCacheableMetadata();
     $expected_cacheability->setCacheTags(array_values(array_diff($expected_cacheability->getCacheTags(), ['4xx-response'])));
     $expected_document = $expected_response->getResponseData();
     $response = $this->request('GET', $filtered_collection_include_url, $request_options);
     // MISS or UNCACHEABLE depends on the included data. It must not be HIT.
-    $dynamic_cache = $expected_cacheability->getCacheMaxAge() === 0 ? 'UNCACHEABLE' : 'MISS';
+    $dynamic_cache = $expected_cacheability->getCacheMaxAge() === 0 || !empty(array_intersect(['user', 'session'], $expected_cacheability->getCacheContexts())) ? 'UNCACHEABLE' : 'MISS';
     $this->assertResourceResponse(200, $expected_document, $response, $expected_cacheability->getCacheTags(), $expected_cacheability->getCacheContexts(), FALSE, $dynamic_cache);
 
     // If the response should vary by a user's authorizations, grant permissions
@@ -1136,13 +1182,13 @@ abstract class ResourceTestBase extends BrowserTestBase {
       $applicable_permissions = array_intersect_key(static::getIncludePermissions(), array_flip($relationship_field_names));
       $flattened_permissions = array_unique(array_reduce($applicable_permissions, 'array_merge', []));
       $this->grantPermissionsToTestedRole($flattened_permissions);
-      $expected_response = $this->getExpectedCollectionResponse($filtered_entity_collection, $filtered_collection_include_url->toString(), $request_options, $relationship_field_names);
+      $expected_response = $this->getExpectedCollectionResponse($filtered_entity_collection, $filtered_collection_include_url->toString(), $request_options, $relationship_field_names, TRUE);
       $expected_cacheability = $expected_response->getCacheableMetadata();
       $expected_document = $expected_response->getResponseData();
       $response = $this->request('GET', $filtered_collection_include_url, $request_options);
       $requires_include_only_permissions = !empty($flattened_permissions);
-      $cacheable = $expected_cacheability->getCacheMaxAge() !== 0;
-      $dynamic_cache = $cacheable ? $requires_include_only_permissions ? 'MISS' : 'HIT' : 'UNCACHEABLE';
+      $uncacheable = $expected_cacheability->getCacheMaxAge() === 0 || !empty(array_intersect(['user', 'session'], $expected_cacheability->getCacheContexts()));
+      $dynamic_cache = !$uncacheable ? $requires_include_only_permissions ? 'MISS' : 'HIT' : 'UNCACHEABLE';
       $this->assertResourceResponse(200, $expected_document, $response, $expected_cacheability->getCacheTags(), $expected_cacheability->getCacheContexts(), FALSE, $dynamic_cache);
     }
 
@@ -1176,13 +1222,15 @@ abstract class ResourceTestBase extends BrowserTestBase {
    * @param array|null $included_paths
    *   (optional) Any include paths that should be appended to the expected
    *   response.
+   * @param bool $filtered
+   *   Whether the collection is filtered or not.
    *
    * @return \Drupal\jsonapi\ResourceResponse
    *   A ResourceResponse for the expected entity collection.
    *
    * @see \GuzzleHttp\ClientInterface::request()
    */
-  protected function getExpectedCollectionResponse(array $collection, $self_link, array $request_options, array $included_paths = NULL) {
+  protected function getExpectedCollectionResponse(array $collection, $self_link, array $request_options, array $included_paths = NULL, $filtered = FALSE) {
     $resource_identifiers = array_map([static::class, 'toResourceIdentifier'], $collection);
     $individual_responses = static::toResourceResponses($this->getResponses(static::getResourceLinks($resource_identifiers), $request_options));
     $merged_response = static::toCollectionResourceResponse($individual_responses, $self_link, TRUE);
@@ -1192,7 +1240,7 @@ abstract class ResourceTestBase extends BrowserTestBase {
       $merged_document['data'] = [];
     }
 
-    $cacheability = static::getExpectedCollectionCacheability($collection, NULL, $this->account);
+    $cacheability = static::getExpectedCollectionCacheability($collection, NULL, $this->account, $filtered);
     $cacheability->setCacheMaxAge($merged_response->getCacheableMetadata()->getCacheMaxAge());
 
     $collection_response = ResourceResponse::create($merged_document);

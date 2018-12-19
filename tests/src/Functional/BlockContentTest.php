@@ -6,6 +6,7 @@ use Drupal\block_content\Entity\BlockContent;
 use Drupal\block_content\Entity\BlockContentType;
 use Drupal\Core\Cache\Cache;
 use Drupal\Core\Url;
+use Drupal\Tests\jsonapi\Traits\CommonCollectionFilterAccessTestPatternsTrait;
 
 /**
  * JSON:API integration test for the "BlockContent" content entity type.
@@ -13,6 +14,8 @@ use Drupal\Core\Url;
  * @group jsonapi
  */
 class BlockContentTest extends ResourceTestBase {
+
+  use CommonCollectionFilterAccessTestPatternsTrait;
 
   /**
    * {@inheritdoc}
@@ -196,6 +199,14 @@ class BlockContentTest extends ResourceTestBase {
    */
   public function testRelated() {
     $this->markTestSkipped('Remove this in https://www.drupal.org/project/jsonapi/issues/2940339');
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function testCollectionFilterAccess() {
+    $this->entity->setPublished()->save();
+    $this->doTestCollectionFilterAccessForPublishableEntities('info', NULL, 'administer blocks');
   }
 
 }

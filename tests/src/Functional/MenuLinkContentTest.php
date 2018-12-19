@@ -4,6 +4,7 @@ namespace Drupal\Tests\jsonapi\Functional;
 
 use Drupal\Core\Url;
 use Drupal\menu_link_content\Entity\MenuLinkContent;
+use Drupal\Tests\jsonapi\Traits\CommonCollectionFilterAccessTestPatternsTrait;
 
 /**
  * JSON:API integration test for the "MenuLinkContent" content entity type.
@@ -11,6 +12,8 @@ use Drupal\menu_link_content\Entity\MenuLinkContent;
  * @group jsonapi
  */
 class MenuLinkContentTest extends ResourceTestBase {
+
+  use CommonCollectionFilterAccessTestPatternsTrait;
 
   /**
    * {@inheritdoc}
@@ -141,6 +144,13 @@ class MenuLinkContentTest extends ResourceTestBase {
       default:
         return parent::getExpectedUnauthorizedAccessMessage($method);
     }
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function testCollectionFilterAccess() {
+    $this->doTestCollectionFilterAccessBasedOnPermissions('title', 'administer menu');
   }
 
 }

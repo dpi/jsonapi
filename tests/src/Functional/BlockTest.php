@@ -181,8 +181,8 @@ class BlockTest extends ResourceTestBase {
   /**
    * {@inheritdoc}
    */
-  protected static function getExpectedCollectionCacheability(array $collection, array $sparse_fieldset = NULL, AccountInterface $account) {
-    return parent::getExpectedCollectionCacheability($collection, $sparse_fieldset, $account)
+  protected static function getExpectedCollectionCacheability(array $collection, array $sparse_fieldset = NULL, AccountInterface $account, $filtered = FALSE) {
+    return parent::getExpectedCollectionCacheability($collection, $sparse_fieldset, $account, $filtered)
       ->addCacheTags(['user:2'])
       ->addCacheContexts(['user.roles']);
   }
