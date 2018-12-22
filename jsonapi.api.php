@@ -13,7 +13,7 @@ use Drupal\Core\Access\AccessResult;
  *
  * @section overview Overview
  * The JSON:API module is a Drupal-centric implementation of the JSON:API
- * specification. By its own definition, the JSON:API specification is "is a
+ * specification. By its own definition, the JSON:API specification "is a
  * specification for how a client should request that resources be fetched or
  * modified, and how a server should respond to those requests. [It] is designed
  * to minimize both the number of requests and the amount of data transmitted
@@ -132,7 +132,7 @@ use Drupal\Core\Access\AccessResult;
  * To help develop compatible clients, every response indicates the version of
  * the JSON:API specification used under its "jsonapi" key. Future releases
  * *may* increment the minor version number if the module implements features of
- * a later specification. Remember that he specification stipulates that future
+ * a later specification. Remember that the specification stipulates that future
  * versions *will* remain backwards compatible as only additions may be
  * released.
  *
