@@ -45,6 +45,9 @@ class DateTimeNormalizer extends NormalizerBase implements DenormalizerInterface
     $drupal_date_time = floatval(floatval(\Drupal::VERSION) >= 8.7)
       ? $datetime->getDateTime()
       : ($datetime->getValue() ? new DrupalDateTime($datetime->getValue(), 'UTC') : NULL);
+    if ($drupal_date_time === NULL) {
+      return $drupal_date_time;
+    }
     return $drupal_date_time
       // Set an explicit timezone. Otherwise, timestamps may end up being
       // normalized using the user's preferred timezone. Which would result in

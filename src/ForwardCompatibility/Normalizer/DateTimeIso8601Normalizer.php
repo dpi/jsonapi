@@ -42,6 +42,9 @@ class DateTimeIso8601Normalizer extends DateTimeNormalizer {
       $drupal_date_time = floatval(floatval(\Drupal::VERSION) >= 8.7)
         ? $datetime->getDateTime()
         : ($datetime->getValue() ? new DrupalDateTime($datetime->getValue(), 'UTC') : NULL);
+      if ($drupal_date_time === NULL) {
+        return $drupal_date_time;
+      }
       return $drupal_date_time->format($this->allowedFormats['date-only']);
     }
     return parent::normalize($datetime, $format, $context);
