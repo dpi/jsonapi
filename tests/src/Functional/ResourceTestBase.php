@@ -482,10 +482,7 @@ abstract class ResourceTestBase extends BrowserTestBase {
     return [
       // Cache contexts for JSON:API URL query parameters.
       'url.query_args:fields',
-      'url.query_args:filter',
       'url.query_args:include',
-      'url.query_args:page',
-      'url.query_args:sort',
       // Drupal defaults.
       'url.site',
       'user.permissions',

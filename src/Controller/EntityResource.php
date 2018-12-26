@@ -392,6 +392,12 @@ class EntityResource {
 
     $response->addCacheableDependency($query_cacheability);
     $response->addCacheableDependency($count_query_cacheability);
+    $response->addCacheableDependency((new CacheableMetadata())
+      ->addCacheContexts([
+        'url.query_args:filter',
+        'url.query_args:sort',
+        'url.query_args:page',
+      ]));
 
     return $response;
   }
