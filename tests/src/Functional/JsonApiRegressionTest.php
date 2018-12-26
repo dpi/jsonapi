@@ -8,7 +8,9 @@ use Drupal\comment\Tests\CommentTestTrait;
 use Drupal\Component\Serialization\Json;
 use Drupal\Core\Field\FieldStorageDefinitionInterface;
 use Drupal\Core\Url;
+use Drupal\datetime\Plugin\Field\FieldType\DateTimeItem;
 use Drupal\field\Entity\FieldConfig;
+use Drupal\field\Entity\FieldStorageConfig;
 use Drupal\node\Entity\Node;
 use Drupal\node\Entity\NodeType;
 use Drupal\shortcut\Entity\Shortcut;
@@ -631,6 +633,55 @@ class JsonApiRegressionTest extends JsonApiFunctionalTestBase {
     $this->assertSame($doc['data'][0]['id'], $shortcut->uuid());
     $this->assertSame($doc['data'][0]['attributes']['drupal_internal__id'], (int) $shortcut->id());
     $this->assertSame($doc['data'][0]['attributes']['title'], $shortcut->label());
+  }
+
+  /**
+   * Ensures datetime fields are normalized using the correct timezone.
+   *
+   * @see https://www.drupal.org/project/jsonapi/issues/2999438
+   */
+  public function testPatchingDateTimeNormalizedWrongTimeZoneIssue3021194() {
+    // Set up data model.
+    $this->assertTrue($this->container->get('module_installer')->install(['datetime'], TRUE), 'Installed modules.');
+    $this->drupalCreateContentType(['type' => 'page']);
+    $this->rebuildAll();
+    FieldStorageConfig::create([
+      'field_name' => 'when',
+      'type' => 'datetime',
+      'entity_type' => 'node',
+      'settings' => ['datetime_type' => DateTimeItem::DATETIME_TYPE_DATETIME],
+    ])
+      ->save();
+    FieldConfig::create([
+      'field_name' => 'when',
+      'entity_type' => 'node',
+      'bundle' => 'page',
+    ])
+      ->save();
+
+    // Create data.
+    $page = Node::create([
+      'title' => 'Stegosaurus',
+      'type' => 'page',
+      'when' => [
+        'value' => '2018-09-16T12:00:00',
+      ],
+    ]);
+    $page->save();
+
+    // Test.
+    $user = $this->drupalCreateUser([
+      'access content',
+    ]);
+    $response = $this->request('GET', Url::fromUri('internal:/jsonapi/node/page/' . $page->uuid()), [
+      RequestOptions::AUTH => [
+        $user->getUsername(),
+        $user->pass_raw,
+      ],
+    ]);
+    $this->assertSame(200, $response->getStatusCode());
+    $doc = Json::decode((string) $response->getBody());
+    $this->assertSame('2018-09-16T22:00:00+10:00', $doc['data']['attributes']['when']);
   }
 
 }

@@ -2,6 +2,7 @@
 
 namespace Drupal\jsonapi\ForwardCompatibility\Normalizer;
 
+use Drupal\Core\Datetime\DrupalDateTime;
 use Drupal\Core\TypedData\Plugin\DataType\DateTimeIso8601;
 use Drupal\datetime\Plugin\Field\FieldType\DateTimeItem;
 
@@ -37,7 +38,11 @@ class DateTimeIso8601Normalizer extends DateTimeNormalizer {
   public function normalize($datetime, $format = NULL, array $context = []) {
     $field_item = $datetime->getParent();
     if ($field_item instanceof DateTimeItem && $field_item->getFieldDefinition()->getFieldStorageDefinition()->getSetting('datetime_type') === DateTimeItem::DATETIME_TYPE_DATE) {
-      return $datetime->getDateTime()->format($this->allowedFormats['date-only']);
+      // @todo Remove when JSON:API only supports Drupal >=8.7, which fixed this in https://www.drupal.org/project/drupal/issues/3002164.
+      $drupal_date_time = floatval(floatval(\Drupal::VERSION) >= 8.7)
+        ? $datetime->getDateTime()
+        : ($datetime->getValue() ? new DrupalDateTime($datetime->getValue(), 'UTC') : NULL);
+      return $drupal_date_time->format($this->allowedFormats['date-only']);
     }
     return parent::normalize($datetime, $format, $context);
   }

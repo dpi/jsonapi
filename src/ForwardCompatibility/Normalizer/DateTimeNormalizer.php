@@ -2,6 +2,7 @@
 
 namespace Drupal\jsonapi\ForwardCompatibility\Normalizer;
 
+use Drupal\Core\Datetime\DrupalDateTime;
 use Drupal\Core\TypedData\Type\DateTimeInterface;
 use Drupal\jsonapi\Normalizer\NormalizerBase;
 use Symfony\Component\Serializer\Exception\UnexpectedValueException;
@@ -40,7 +41,11 @@ class DateTimeNormalizer extends NormalizerBase implements DenormalizerInterface
    * {@inheritdoc}
    */
   public function normalize($datetime, $format = NULL, array $context = []) {
-    return $datetime->getDateTime()
+    // @todo Remove when JSON:API only supports Drupal >=8.7, which fixed this in https://www.drupal.org/project/drupal/issues/3002164.
+    $drupal_date_time = floatval(floatval(\Drupal::VERSION) >= 8.7)
+      ? $datetime->getDateTime()
+      : ($datetime->getValue() ? new DrupalDateTime($datetime->getValue(), 'UTC') : NULL);
+    return $drupal_date_time
       // Set an explicit timezone. Otherwise, timestamps may end up being
       // normalized using the user's preferred timezone. Which would result in
       // many variations and complex caching.
