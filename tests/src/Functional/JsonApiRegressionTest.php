@@ -684,4 +684,85 @@ class JsonApiRegressionTest extends JsonApiFunctionalTestBase {
     $this->assertSame('2018-09-16T22:00:00+10:00', $doc['data']['attributes']['when']);
   }
 
+  /**
+   * Ensures PATCHing datetime (both date-only & date+time) fields is possible.
+   *
+   * @see https://www.drupal.org/project/jsonapi/issues/3021194
+   */
+  public function testPatchingDateTimeFieldsFromIssue3021194() {
+    // Set up data model.
+    $this->assertTrue($this->container->get('module_installer')->install(['datetime'], TRUE), 'Installed modules.');
+    $this->drupalCreateContentType(['type' => 'page']);
+    $this->rebuildAll();
+    FieldStorageConfig::create([
+      'field_name' => 'when',
+      'type' => 'datetime',
+      'entity_type' => 'node',
+      'settings' => ['datetime_type' => DateTimeItem::DATETIME_TYPE_DATE],
+    ])
+      ->save();
+    FieldConfig::create([
+      'field_name' => 'when',
+      'entity_type' => 'node',
+      'bundle' => 'page',
+    ])
+      ->save();
+    FieldStorageConfig::create([
+      'field_name' => 'when_exactly',
+      'type' => 'datetime',
+      'entity_type' => 'node',
+      'settings' => ['datetime_type' => DateTimeItem::DATETIME_TYPE_DATETIME],
+    ])
+      ->save();
+    FieldConfig::create([
+      'field_name' => 'when_exactly',
+      'entity_type' => 'node',
+      'bundle' => 'page',
+    ])
+      ->save();
+
+    // Create data.
+    $page = Node::create([
+      'title' => 'Stegosaurus',
+      'type' => 'page',
+      'when' => [
+        'value' => '2018-12-19',
+      ],
+      'when_exactly' => [
+        'value' => '2018-12-19T17:00:00',
+      ],
+    ]);
+    $page->save();
+
+    // Test.
+    $user = $this->drupalCreateUser([
+      'access content',
+      'edit any page content',
+    ]);
+    $request_options = [
+      RequestOptions::AUTH => [
+        $user->getUsername(),
+        $user->pass_raw,
+      ],
+      RequestOptions::HEADERS => [
+        'Content-Type' => 'application/vnd.api+json',
+        'Accept' => 'application/vnd.api+json',
+      ],
+    ];
+    $node_url = Url::fromUri('internal:/jsonapi/node/page/' . $page->uuid());
+    $response = $this->request('GET', $node_url, $request_options);
+    $this->assertSame(200, $response->getStatusCode());
+    $doc = Json::decode((string) $response->getBody());
+    $this->assertSame('2018-12-19', $doc['data']['attributes']['when']);
+    $this->assertSame('2018-12-20T04:00:00+11:00', $doc['data']['attributes']['when_exactly']);
+    $doc['data']['attributes']['when'] = '2018-12-20';
+    $doc['data']['attributes']['when_exactly'] = '2018-12-19T19:00:00+01:00';
+    $request_options = $request_options + [RequestOptions::JSON => $doc];
+    $response = $this->request('PATCH', $node_url, $request_options);
+    $this->assertSame(200, $response->getStatusCode());
+    $doc = Json::decode((string) $response->getBody());
+    $this->assertSame('2018-12-20', $doc['data']['attributes']['when']);
+    $this->assertSame('2018-12-20T05:00:00+11:00', $doc['data']['attributes']['when_exactly']);
+  }
+
 }

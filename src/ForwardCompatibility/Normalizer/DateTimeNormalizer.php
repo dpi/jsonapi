@@ -13,7 +13,7 @@ use Symfony\Component\Serializer\Normalizer\DenormalizerInterface;
  *
  * @internal
  * @see \Drupal\serialization\Normalizer\DateTimeNormalizer
- * @todo Remove when JSON:API requires Drupal 8.6.
+ * @todo Remove when JSON:API requires Drupal 8.7.
  */
 class DateTimeNormalizer extends NormalizerBase implements DenormalizerInterface {
 
@@ -75,26 +75,30 @@ class DateTimeNormalizer extends NormalizerBase implements DenormalizerInterface
    * {@inheritdoc}
    */
   public function denormalize($data, $class, $format = NULL, array $context = []) {
-    // First check for a provided format, and if provided, create \DateTime
-    // object using it.
-    if (!empty($context['datetime_format'])) {
-      return \DateTime::createFromFormat($context['datetime_format'], $data);
+    // This only knows how to denormalize datetime strings and timestamps. If
+    // something else is received, let validation constraints handle this.
+    if (!is_string($data) && !is_numeric($data)) {
+      return $data;
     }
 
     // Loop through the allowed formats and create a \DateTime from the
     // input data if it matches the defined pattern. Since the formats are
     // unambiguous (i.e., they reference an absolute time with a defined time
     // zone), only one will ever match.
-    foreach ($this->allowedFormats as $format) {
+    $allowed_formats = isset($context['datetime_allowed_formats'])
+      ? $context['datetime_allowed_formats']
+      : $this->allowedFormats;
+    foreach ($allowed_formats as $format) {
       $date = \DateTime::createFromFormat($format, $data);
-      if ($date !== FALSE) {
+      $errors = \DateTime::getLastErrors();
+      if ($date !== FALSE && empty($errors['errors']) && empty($errors['warnings'])) {
         return $date;
       }
     }
 
     $format_strings = [];
 
-    foreach ($this->allowedFormats as $label => $format) {
+    foreach ($allowed_formats as $label => $format) {
       $format_strings[] = "\"$format\" ($label)";
     }
 
