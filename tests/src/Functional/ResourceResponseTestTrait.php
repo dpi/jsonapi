@@ -535,7 +535,7 @@ trait ResourceResponseTestTrait {
       'url.query_args:sort',
       // Drupal defaults.
       'url.site',
-    ], $this->entity->getEntityType()->isRevisionable() ? ['url.query_args:resource_version'] : []);
+    ], $this->entity->getEntityType()->isRevisionable() ? ['url.query_args:resourceVersion'] : []);
     $cacheability = (new CacheableMetadata())->addCacheContexts($cache_contexts)->addCacheTags(['http_response']);
     return (new ResourceResponse([
       // Empty to-one relationships should be NULL and empty to-many

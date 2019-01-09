@@ -31,7 +31,7 @@ final class ResourceVersionRouteEnhancer implements EnhancerInterface {
    *
    * @var string
    */
-  const RESOURCE_VERSION_QUERY_PARAMETER = 'resource_version';
+  const RESOURCE_VERSION_QUERY_PARAMETER = 'resourceVersion';
 
   /**
    * A route parameter key which indicates that working copies were requested.

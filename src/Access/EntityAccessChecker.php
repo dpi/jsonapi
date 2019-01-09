@@ -11,6 +11,7 @@ use Drupal\Core\Entity\RevisionableInterface;
 use Drupal\Core\Routing\RouteMatch;
 use Drupal\Core\Session\AccountInterface;
 use Drupal\jsonapi\Exception\EntityAccessDeniedHttpException;
+use Drupal\jsonapi\JsonApiSpec;
 use Drupal\jsonapi\LabelOnlyEntity;
 use Drupal\jsonapi\ResourceType\ResourceTypeRepositoryInterface;
 use Drupal\media\Access\MediaRevisionAccessCheck;
@@ -197,7 +198,7 @@ class EntityAccessChecker {
   public function checkEntityAccess(EntityInterface $entity, $operation, AccountInterface $account) {
     $access = $entity->access($operation, $account, TRUE);
     if ($entity->getEntityType()->isRevisionable()) {
-      $access = AccessResult::neutral()->addCacheContexts(['url.query_args:resource_version'])->orIf($access);
+      $access = AccessResult::neutral()->addCacheContexts(['url.query_args:' . JsonApiSpec::VERSION_QUERY_PARAMETER])->orIf($access);
       if (!$entity->isDefaultRevision()) {
         assert($operation === 'view', 'JSON:API does not yet support mutable operations on revisions.');
         $revision_access = $this->checkRevisionViewAccess($entity, $account);

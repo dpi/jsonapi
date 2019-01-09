@@ -330,7 +330,7 @@ class NodeTest extends ResourceTestBase {
       $expected_document,
       $response,
       ['4xx-response', 'http_response', 'node:1'],
-      ['url.query_args:resource_version', 'user.permissions'],
+      ['url.query_args:resourceVersion', 'user.permissions'],
       FALSE,
       'MISS'
     );

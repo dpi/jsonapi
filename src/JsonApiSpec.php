@@ -100,7 +100,7 @@ class JsonApiSpec {
    *
    * @var string
    */
-  const VERSION_QUERY_PARAMETER = 'resource_version';
+  const VERSION_QUERY_PARAMETER = 'resourceVersion';
 
   /**
    * Gets the reserved (official) JSON:API query parameters.

@@ -450,7 +450,7 @@ abstract class ResourceTestBase extends BrowserTestBase {
       ->setCacheTags(['4xx-response', 'http_response'])
       ->addCacheContexts(['user.permissions'])
       ->addCacheContexts($this->entity->getEntityType()->isRevisionable()
-        ? ['url.query_args:resource_version']
+        ? ['url.query_args:resourceVersion']
         : []
       );
   }
@@ -496,7 +496,7 @@ abstract class ResourceTestBase extends BrowserTestBase {
       'user.permissions',
     ];
     $entity_type = $this->entity->getEntityType();
-    return Cache::mergeContexts($cache_contexts, $entity_type->isRevisionable() ? ['url.query_args:resource_version'] : []);
+    return Cache::mergeContexts($cache_contexts, $entity_type->isRevisionable() ? ['url.query_args:resourceVersion'] : []);
   }
 
   /**
@@ -560,7 +560,7 @@ abstract class ResourceTestBase extends BrowserTestBase {
       'url.site',
     ];
     // If the entity type is revisionable, add a resource version cache context.
-    $cache_contexts = Cache::mergeContexts($cache_contexts, $entity_type->isRevisionable() ? ['url.query_args:resource_version'] : []);
+    $cache_contexts = Cache::mergeContexts($cache_contexts, $entity_type->isRevisionable() ? ['url.query_args:resourceVersion'] : []);
     $cacheability->addCacheContexts($cache_contexts);
     return $cacheability;
   }
@@ -1691,7 +1691,7 @@ abstract class ResourceTestBase extends BrowserTestBase {
    */
   protected function getExpectedGetRelationshipResponse($relationship_field_name, EntityInterface $entity = NULL) {
     $entity = $entity ?: $this->entity;
-    $access = AccessResult::neutral()->addCacheContexts($entity->getEntityType()->isRevisionable() ? ['url.query_args:resource_version'] : []);
+    $access = AccessResult::neutral()->addCacheContexts($entity->getEntityType()->isRevisionable() ? ['url.query_args:resourceVersion'] : []);
     $access = $access->orIf(static::entityFieldAccess($entity, $this->resourceType->getInternalName($relationship_field_name), 'view', $this->account));
     if (!$access->isAllowed()) {
       $via_link = Url::fromRoute(
@@ -1819,7 +1819,7 @@ abstract class ResourceTestBase extends BrowserTestBase {
     /* @var \Drupal\jsonapi\ResourceResponse[] $relationship_responses */
     $base_resource_identifier = static::toResourceIdentifier($entity);
     $internal_name = $this->resourceType->getInternalName($relationship_field_name);
-    $access = AccessResult::neutral()->addCacheContexts($entity->getEntityType()->isRevisionable() ? ['url.query_args:resource_version'] : []);
+    $access = AccessResult::neutral()->addCacheContexts($entity->getEntityType()->isRevisionable() ? ['url.query_args:resourceVersion'] : []);
     $access = $access->orIf(static::entityFieldAccess($entity, $internal_name, 'view', $this->account));
     if (!$access->isAllowed()) {
       $detail = 'The current user is not allowed to view this relationship.';
@@ -1849,7 +1849,7 @@ abstract class ResourceTestBase extends BrowserTestBase {
           'url.query_args:include',
           // Drupal defaults.
           'url.site',
-        ], $this->entity->getEntityType()->isRevisionable() ? ['url.query_args:resource_version'] : []);
+        ], $this->entity->getEntityType()->isRevisionable() ? ['url.query_args:resourceVersion'] : []);
         $cacheability = (new CacheableMetadata())->addCacheContexts($cache_contexts)->addCacheTags(['http_response']);
         $related_response = isset($relationship_document['errors'])
           ? $relationship_response
@@ -2673,7 +2673,7 @@ abstract class ResourceTestBase extends BrowserTestBase {
     if (!in_array($this->entity->getEntityTypeId(), ['node', 'media'])) {
       $this->setUpRevisionAuthorization('GET');
       $url = Url::fromRoute(sprintf('jsonapi.%s.individual', static::$resourceTypeName), ['entity' => $this->entity->uuid()])->setAbsolute();
-      $url->setOption('query', ['resource_version' => 'id:' . $this->entity->getRevisionId()]);
+      $url->setOption('query', ['resourceVersion' => 'id:' . $this->entity->getRevisionId()]);
       $request_options = [];
       $request_options[RequestOptions::HEADERS]['Accept'] = 'application/vnd.api+json';
       $request_options = NestedArray::mergeDeep($request_options, $this->getAuthenticationRequestOptions());
@@ -2681,7 +2681,7 @@ abstract class ResourceTestBase extends BrowserTestBase {
       $detail = 'JSON:API does not yet support resource versioning for this resource type.';
       $detail .= ' For context, see https://www.drupal.org/project/jsonapi/issues/2992833#comment-12818258.';
       $detail .= ' To contribute, see https://www.drupal.org/project/drupal/issues/2350939 and https://www.drupal.org/project/drupal/issues/2809177.';
-      $this->assertResourceErrorResponse(501, $detail, $url, $response, FALSE, ['http_response'], ['url.path', 'url.query_args:resource_version']);
+      $this->assertResourceErrorResponse(501, $detail, $url, $response, FALSE, ['http_response'], ['url.path', 'url.query_args:resourceVersion']);
       return;
     }
 
@@ -2718,35 +2718,35 @@ abstract class ResourceTestBase extends BrowserTestBase {
     $related_url = Url::fromRoute(sprintf('jsonapi.%s.%s.related', static::$resourceTypeName, 'field_jsonapi_test_entity_ref'), ['entity' => $this->entity->uuid()])->setAbsolute();
     /* $url = $this->entity->toUrl('jsonapi'); */
     $original_revision_id_url = clone $url;
-    $original_revision_id_url->setOption('query', ['resource_version' => "id:$original_revision_id"]);
+    $original_revision_id_url->setOption('query', ['resourceVersion' => "id:$original_revision_id"]);
     $original_revision_id_relationship_url = clone $relationship_url;
-    $original_revision_id_relationship_url->setOption('query', ['resource_version' => "id:$original_revision_id"]);
+    $original_revision_id_relationship_url->setOption('query', ['resourceVersion' => "id:$original_revision_id"]);
     $original_revision_id_related_url = clone $related_url;
-    $original_revision_id_related_url->setOption('query', ['resource_version' => "id:$original_revision_id"]);
+    $original_revision_id_related_url->setOption('query', ['resourceVersion' => "id:$original_revision_id"]);
     $latest_revision_id_url = clone $url;
-    $latest_revision_id_url->setOption('query', ['resource_version' => "id:$latest_revision_id"]);
+    $latest_revision_id_url->setOption('query', ['resourceVersion' => "id:$latest_revision_id"]);
     $latest_revision_id_relationship_url = clone $relationship_url;
-    $latest_revision_id_relationship_url->setOption('query', ['resource_version' => "id:$latest_revision_id"]);
+    $latest_revision_id_relationship_url->setOption('query', ['resourceVersion' => "id:$latest_revision_id"]);
     $latest_revision_id_related_url = clone $related_url;
-    $latest_revision_id_related_url->setOption('query', ['resource_version' => "id:$latest_revision_id"]);
+    $latest_revision_id_related_url->setOption('query', ['resourceVersion' => "id:$latest_revision_id"]);
     $rel_latest_version_url = clone $url;
-    $rel_latest_version_url->setOption('query', ['resource_version' => 'rel:latest-version']);
+    $rel_latest_version_url->setOption('query', ['resourceVersion' => 'rel:latest-version']);
     $rel_latest_version_relationship_url = clone $relationship_url;
-    $rel_latest_version_relationship_url->setOption('query', ['resource_version' => 'rel:latest-version']);
+    $rel_latest_version_relationship_url->setOption('query', ['resourceVersion' => 'rel:latest-version']);
     $rel_latest_version_related_url = clone $related_url;
-    $rel_latest_version_related_url->setOption('query', ['resource_version' => 'rel:latest-version']);
+    $rel_latest_version_related_url->setOption('query', ['resourceVersion' => 'rel:latest-version']);
     $rel_latest_version_collection_url = clone $collection_url;
-    $rel_latest_version_collection_url->setOption('query', ['resource_version' => 'rel:latest-version']);
+    $rel_latest_version_collection_url->setOption('query', ['resourceVersion' => 'rel:latest-version']);
     $rel_working_copy_url = clone $url;
-    $rel_working_copy_url->setOption('query', ['resource_version' => 'rel:working-copy']);
+    $rel_working_copy_url->setOption('query', ['resourceVersion' => 'rel:working-copy']);
     $rel_working_copy_relationship_url = clone $relationship_url;
-    $rel_working_copy_relationship_url->setOption('query', ['resource_version' => 'rel:working-copy']);
+    $rel_working_copy_relationship_url->setOption('query', ['resourceVersion' => 'rel:working-copy']);
     $rel_working_copy_related_url = clone $related_url;
-    $rel_working_copy_related_url->setOption('query', ['resource_version' => 'rel:working-copy']);
+    $rel_working_copy_related_url->setOption('query', ['resourceVersion' => 'rel:working-copy']);
     $rel_working_copy_collection_url = clone $collection_url;
-    $rel_working_copy_collection_url->setOption('query', ['resource_version' => 'rel:working-copy']);
+    $rel_working_copy_collection_url->setOption('query', ['resourceVersion' => 'rel:working-copy']);
     $rel_invalid_collection_url = clone $collection_url;
-    $rel_invalid_collection_url->setOption('query', ['resource_version' => 'rel:invalid']);
+    $rel_invalid_collection_url->setOption('query', ['resourceVersion' => 'rel:invalid']);
     $revision_id_key = 'drupal_internal__' . $this->entity->getEntityType()->getKey('revision');
     $published_key = $this->entity->getEntityType()->getKey('published');
     $revision_translation_affected_key = $this->entity->getEntityType()->getKey('revision_translation_affected');
@@ -2776,7 +2776,7 @@ abstract class ResourceTestBase extends BrowserTestBase {
 
     $this->setUpRevisionAuthorization('GET');
 
-    // Ensure that the URL without a `resource_version` query parameter returns
+    // Ensure that the URL without a `resourceVersion` query parameter returns
     // the default revision. This is always the latest revision when
     // content_moderation is not installed.
     $actual_response = $this->request('GET', $url, $request_options);
@@ -2873,12 +2873,12 @@ abstract class ResourceTestBase extends BrowserTestBase {
     $filtered_collection_expected_cache_contexts = [
       'url.path',
       'url.query_args:filter',
-      'url.query_args:resource_version',
+      'url.query_args:resourceVersion',
     ];
     $this->assertResourceErrorResponse(501, 'JSON:API does not support filtering on revisions other than the latest version because a secure Drupal core API does not yet exist to do so.', $rel_working_copy_collection_url_filtered, $actual_response, FALSE, ['http_response'], $filtered_collection_expected_cache_contexts);
     // Fetch the collection URL using an invalid version identifier.
     $actual_response = $this->request('GET', $rel_invalid_collection_url, $request_options);
-    $this->assertResourceErrorResponse(400, 'Collection resources only support the following resource version identifiers: rel:latest-version, rel:working-copy', $rel_invalid_collection_url, $actual_response, FALSE, ['4xx-response', 'http_response'], ['url.path', 'url.query_args:resource_version']);
+    $this->assertResourceErrorResponse(400, 'Collection resources only support the following resource version identifiers: rel:latest-version, rel:working-copy', $rel_invalid_collection_url, $actual_response, FALSE, ['4xx-response', 'http_response'], ['url.path', 'url.query_args:resourceVersion']);
 
     // Move the entity to its draft moderation state.
     $entity->set('field_revisionable_number', 42);
