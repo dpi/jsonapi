@@ -115,11 +115,9 @@ services:
     arguments: ['@entity_type.manager', '@entity_field.manager', '@entity_type.bundle.info', '@jsonapi.resource_type.repository', '@module_handler']
   jsonapi.include_resolver:
     class: Drupal\jsonapi\IncludeResolver
-    arguments: ['@entity_type.manager']
-  access_check.jsonapi.relationship_field_access:
-    class: Drupal\jsonapi\Access\RelationshipFieldAccess
-    tags:
-      - { name: access_check, applies_to: _jsonapi_relationship_field_access, needs_incoming_request: TRUE }
+    arguments:
+      - '@entity_type.manager'
+      - '@jsonapi.entity_access_checker'
   paramconverter.jsonapi.entity_uuid:
     parent: paramconverter.entity
     class: Drupal\jsonapi\ParamConverter\EntityUuidConverter
@@ -156,6 +154,22 @@ services:
       # middleware (priority 200) has the opportunity to respond.
       - { name: http_middleware, priority: 201 }
 
+  # Access Control
+  jsonapi.entity_access_checker:
+    class: Drupal\jsonapi\Access\EntityAccessChecker
+    public: false
+    arguments: ['@jsonapi.resource_type.repository', '@router.no_access_checks', '@current_user', '@entity.repository']
+    calls:
+      - [setNodeRevisionAccessCheck, ['@?access_check.node.revision']] # This is only injected when the service is available.
+      - [setMediaRevisionAccessCheck, ['@?access_check.media.revision']] # This is only injected when the service is available.
+      # This is a temporary measure. JSON:API should not need to be aware of the Content Moderation module.
+      - [setLatestRevisionCheck, ['@?access_check.latest_revision']] # This is only injected when the service is available.
+  access_check.jsonapi.relationship_field_access:
+    class: Drupal\jsonapi\Access\RelationshipFieldAccess
+    arguments: ['@jsonapi.entity_access_checker']
+    tags:
+      - { name: access_check, applies_to: _jsonapi_relationship_field_access, needs_incoming_request: TRUE }
+
   # Controller.
   jsonapi.entity_resource:
     class: \Drupal\jsonapi\Controller\EntityResource
@@ -167,6 +181,7 @@ services:
       - '@renderer'
       - '@entity.repository'
       - '@jsonapi.include_resolver'
+      - '@jsonapi.entity_access_checker'
 
   # Event subscribers.
   jsonapi.custom_query_parameter_names_validator.subscriber:
@@ -186,6 +201,34 @@ services:
       - [setSchemaFactory, ['@?schemata.schema_factory']] # This is only injected when the service is available.
     tags:
       - { name: event_subscriber, priority: 1000 }
+
+  # Revision management.
+  jsonapi.version_negotiator:
+    class: Drupal\jsonapi\Revisions\VersionNegotiator
+    public: false
+    tags:
+      - { name: service_collector, tag: jsonapi_version_negotiator, call: addVersionNegotiator }
+  jsonapi.version_negotiator.default:
+    arguments: ['@entity_type.manager']
+    public: false
+    abstract: true
+  jsonapi.version_negotiator.id:
+    class: Drupal\jsonapi\Revisions\VersionById
+    parent: jsonapi.version_negotiator.default
+    tags:
+      - { name: jsonapi_version_negotiator, negotiator_name: 'id' }
+  jsonapi.version_negotiator.rel:
+    class: Drupal\jsonapi\Revisions\VersionByRel
+    parent: jsonapi.version_negotiator.default
+    tags:
+      - { name: jsonapi_version_negotiator, negotiator_name: 'rel' }
+  jsonapi.resource_version.route_enhancer:
+    class: Drupal\jsonapi\Revisions\ResourceVersionRouteEnhancer
+    public: false
+    arguments:
+      - '@jsonapi.version_negotiator'
+    tags:
+      - { name: route_enhancer }
 
   # Deprecated services.
   serializer.normalizer.htt_exception.jsonapi:
