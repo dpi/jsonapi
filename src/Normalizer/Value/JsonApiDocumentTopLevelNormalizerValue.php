@@ -106,7 +106,7 @@ class JsonApiDocumentTopLevelNormalizerValue implements ValueExtractorInterface,
         // Make sure that different sparse fieldsets are cached differently.
         $this->addCacheContexts(array_map(function ($query_parameter_name) {
           return sprintf('url.query_args:%s', $query_parameter_name);
-        }, JsonApiSpec::getReservedQueryParameters()));
+        }, ['fields', 'include']));
       }
       // Every JSON:API document contains absolute URLs.
       $this->addCacheContexts(['url.site']);

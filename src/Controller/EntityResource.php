@@ -13,17 +13,18 @@ use Drupal\Core\Entity\EntityStorageInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Entity\FieldableEntityInterface;
 use Drupal\Core\Entity\Query\QueryInterface;
+use Drupal\Core\Entity\RevisionableStorageInterface;
 use Drupal\Core\Field\FieldDefinitionInterface;
 use Drupal\Core\Field\FieldItemListInterface;
 use Drupal\Core\Render\RenderContext;
 use Drupal\Core\Render\RendererInterface;
+use Drupal\jsonapi\Access\EntityAccessChecker;
 use Drupal\jsonapi\Access\TemporaryQueryGuard;
 use Drupal\jsonapi\Exception\EntityAccessDeniedHttpException;
 use Drupal\jsonapi\Exception\UnprocessableHttpEntityException;
 use Drupal\jsonapi\IncludeResolver;
 use Drupal\jsonapi\JsonApiResource\NullEntityCollection;
 use Drupal\jsonapi\JsonApiResource\ResourceIdentifier;
-use Drupal\jsonapi\LabelOnlyEntity;
 use Drupal\jsonapi\Query\Filter;
 use Drupal\jsonapi\Query\Sort;
 use Drupal\jsonapi\Query\OffsetPage;
@@ -33,6 +34,7 @@ use Drupal\jsonapi\JsonApiResource\JsonApiDocumentTopLevel;
 use Drupal\jsonapi\ResourceResponse;
 use Drupal\jsonapi\ResourceType\ResourceType;
 use Drupal\jsonapi\ResourceType\ResourceTypeRepositoryInterface;
+use Drupal\jsonapi\Revisions\ResourceVersionRouteEnhancer;
 use Drupal\jsonapi\Routing\Routes;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
@@ -96,6 +98,13 @@ class EntityResource {
   protected $includeResolver;
 
   /**
+   * The JSON:API entity access checker.
+   *
+   * @var \Drupal\jsonapi\Access\EntityAccessChecker
+   */
+  protected $entityAccessChecker;
+
+  /**
    * Instantiates a EntityResource object.
    *
    * @param \Drupal\Core\Entity\EntityTypeManagerInterface $entity_type_manager
@@ -112,8 +121,10 @@ class EntityResource {
    *   The entity repository.
    * @param \Drupal\jsonapi\IncludeResolver $include_resolver
    *   The include resolver.
+   * @param \Drupal\jsonapi\Access\EntityAccessChecker $entity_access_checker
+   *   The JSON:API entity access checker.
    */
-  public function __construct(EntityTypeManagerInterface $entity_type_manager, EntityFieldManagerInterface $field_manager, LinkManager $link_manager, ResourceTypeRepositoryInterface $resource_type_repository, RendererInterface $renderer, EntityRepositoryInterface $entity_repository, IncludeResolver $include_resolver) {
+  public function __construct(EntityTypeManagerInterface $entity_type_manager, EntityFieldManagerInterface $field_manager, LinkManager $link_manager, ResourceTypeRepositoryInterface $resource_type_repository, RendererInterface $renderer, EntityRepositoryInterface $entity_repository, IncludeResolver $include_resolver, EntityAccessChecker $entity_access_checker) {
     $this->entityTypeManager = $entity_type_manager;
     $this->fieldManager = $field_manager;
     $this->linkManager = $link_manager;
@@ -121,6 +132,7 @@ class EntityResource {
     $this->renderer = $renderer;
     $this->entityRepository = $entity_repository;
     $this->includeResolver = $include_resolver;
+    $this->entityAccessChecker = $entity_access_checker;
   }
 
   /**
@@ -138,7 +150,7 @@ class EntityResource {
    *   Thrown when access to the entity is not allowed.
    */
   public function getIndividual(EntityInterface $entity, Request $request) {
-    $entity = static::getAccessCheckedEntity($entity);
+    $entity = $this->entityAccessChecker->getAccessCheckedEntity($entity);
     if ($entity instanceof EntityAccessDeniedHttpException) {
       throw $entity;
     }
@@ -342,6 +354,11 @@ class EntityResource {
     $query_cacheability = new CacheableMetadata();
     $query = $this->getCollectionQuery($resource_type, $params, $query_cacheability);
 
+    // If the request is for the latest revision, toggle it on entity query.
+    if ($request->get(ResourceVersionRouteEnhancer::WORKING_COPIES_REQUESTED, FALSE)) {
+      $query->latestRevision();
+    }
+
     try {
       $results = $this->executeQueryInRenderContext(
         $query,
@@ -372,7 +389,7 @@ class EntityResource {
     }
     // Each item of the collection data contains an array with 'entity' and
     // 'access' elements.
-    $collection_data = $this->loadEntitiesWithAccess($storage, $results);
+    $collection_data = $this->loadEntitiesWithAccess($storage, $results, $request->get(ResourceVersionRouteEnhancer::WORKING_COPIES_REQUESTED, FALSE));
     $entity_collection = new EntityCollection($collection_data);
     $entity_collection->setHasNextPage($has_next_page);
 
@@ -392,6 +409,16 @@ class EntityResource {
 
     $response->addCacheableDependency($query_cacheability);
     $response->addCacheableDependency($count_query_cacheability);
+    $response->addCacheableDependency((new CacheableMetadata())
+      ->addCacheContexts([
+        'url.query_args:filter',
+        'url.query_args:sort',
+        'url.query_args:page',
+      ]));
+
+    if ($resource_type->isVersionable()) {
+      $response->addCacheableDependency((new CacheableMetadata())->addCacheContexts([ResourceVersionRouteEnhancer::CACHE_CONTEXT]));
+    }
 
     return $response;
   }
@@ -460,7 +487,7 @@ class EntityResource {
     );
     $collection_data = [];
     foreach ($referenced_entities as $referenced_entity) {
-      $collection_data[] = static::getAccessCheckedEntity($referenced_entity);
+      $collection_data[] = $this->entityAccessChecker->getAccessCheckedEntity($referenced_entity);
     }
     $entity_collection = new EntityCollection($collection_data, $field_list->getFieldDefinition()->getFieldStorageDefinition()->getCardinality());
     $response = $this->buildWrappedResponse($entity_collection, $request, $this->getIncludes($request, $entity_collection, $related));
@@ -1011,49 +1038,27 @@ class EntityResource {
    * @param \Drupal\Core\Entity\EntityStorageInterface $storage
    *   The entity storage to load the entities from.
    * @param int[] $ids
-   *   Array of entity IDs.
+   *   An array of entity IDs, keyed by revision ID if the entity type is
+   *   revisionable.
+   * @param bool $load_latest_revisions
+   *   Whether to load the latest revisions instead of the defaults.
    *
    * @return array
    *   An array of loaded entities and/or an access exceptions.
    */
-  protected function loadEntitiesWithAccess(EntityStorageInterface $storage, array $ids) {
+  protected function loadEntitiesWithAccess(EntityStorageInterface $storage, array $ids, $load_latest_revisions) {
     $output = [];
-    foreach ($storage->loadMultiple($ids) as $entity) {
-      $output[$entity->id()] = static::getAccessCheckedEntity($entity);
+    if ($load_latest_revisions) {
+      assert($storage instanceof RevisionableStorageInterface);
+      $entities = $storage->loadMultipleRevisions(array_keys($ids));
+    }
+    else {
+      $entities = $storage->loadMultiple($ids);
+    }
+    foreach ($entities as $entity) {
+      $output[$entity->id()] = $this->entityAccessChecker->getAccessCheckedEntity($entity);
     }
     return array_values($output);
-  }
-
-  /**
-   * Get the object to normalize and the access based on the provided entity.
-   *
-   * @param \Drupal\Core\Entity\EntityInterface $entity
-   *   The entity to test access for.
-   *
-   * @return \Drupal\Core\Entity\EntityInterface|\Drupal\jsonapi\LabelOnlyEntity|\Drupal\jsonapi\Exception\EntityAccessDeniedHttpException
-   *   The loaded entity, a label only version of that entity or an
-   *   EntityAccessDeniedHttpException object if neither is accessible. All
-   *   three possible return values carry the access result cacheability.
-   */
-  public static function getAccessCheckedEntity(EntityInterface $entity) {
-    /** @var \Drupal\Core\Entity\EntityRepositoryInterface $entity_repository */
-    $entity_repository = \Drupal::service('entity.repository');
-    $entity = $entity_repository->getTranslationFromContext($entity, NULL, ['operation' => 'entity_upcast']);
-    $access = $entity->access('view', NULL, TRUE);
-    $entity->addCacheableDependency($access);
-    if (!$access->isAllowed()) {
-      $label_access = $entity->access('view label', NULL, TRUE);
-      $entity->addCacheableDependency($label_access);
-      if ($label_access->isAllowed()) {
-        return new LabelOnlyEntity($entity);
-      }
-      else {
-        // Pass an exception to the list of things to normalize.
-        return new EntityAccessDeniedHttpException($entity, $access->orIf($label_access), '/data', 'The current user is not allowed to GET the selected resource.');
-      }
-    }
-
-    return $entity;
   }
 
   /**
