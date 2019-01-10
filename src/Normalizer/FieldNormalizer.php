@@ -3,6 +3,8 @@
 namespace Drupal\jsonapi\Normalizer;
 
 use Drupal\Component\Assertion\Inspector;
+use Drupal\Core\Cache\CacheableDependencyInterface;
+use Drupal\Core\Cache\CacheableMetadata;
 use Drupal\Core\Field\EntityReferenceFieldItemList;
 use Drupal\Core\Field\FieldDefinitionInterface;
 use Drupal\Core\Field\FieldItemListInterface;
@@ -50,7 +52,11 @@ class FieldNormalizer extends NormalizerBase implements DenormalizerInterface {
       $cardinality = $field->getFieldDefinition()
         ->getFieldStorageDefinition()
         ->getCardinality();
-      return new FieldNormalizerValue($access, $normalized_field_items, $cardinality, $property_type);
+      $cacheability = CacheableMetadata::createFromObject($access);
+      if ($field instanceof CacheableDependencyInterface) {
+        $cacheability->addCacheableDependency($field);
+      }
+      return new FieldNormalizerValue($cacheability, $normalized_field_items, $cardinality, $property_type);
     }
     else {
       return new NullFieldNormalizerValue($access, $property_type);

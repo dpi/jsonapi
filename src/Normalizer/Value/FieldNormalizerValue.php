@@ -2,7 +2,7 @@
 
 namespace Drupal\jsonapi\Normalizer\Value;
 
-use Drupal\Core\Access\AccessResultInterface;
+use Drupal\Core\Cache\CacheableDependencyInterface;
 use Drupal\Core\Cache\CacheableDependencyTrait;
 
 /**
@@ -39,8 +39,12 @@ class FieldNormalizerValue implements FieldNormalizerValueInterface {
   /**
    * Instantiate a FieldNormalizerValue object.
    *
-   * @param \Drupal\Core\Access\AccessResultInterface $field_access_result
-   *   The field access result.
+   * @param \Drupal\Core\Cache\CacheableDependencyInterface $field_cacheability
+   *   The cacheability of the normalized field. This cacheability is not part
+   *   of $values because field item list is normalized by Drupal core's
+   *   serialization system, which was never designed with cacheability in mind.
+   *   FieldNormalizer::normalize() must catch the out-of-band bubbled
+   *   cacheability and then passes it to this value object.
    * @param \Drupal\jsonapi\Normalizer\Value\FieldItemNormalizerValue[] $values
    *   The normalized result.
    * @param int $cardinality
@@ -48,9 +52,9 @@ class FieldNormalizerValue implements FieldNormalizerValueInterface {
    * @param string $property_type
    *   The property type of the field: 'attributes' or 'relationships'.
    */
-  public function __construct(AccessResultInterface $field_access_result, array $values, $cardinality, $property_type) {
+  public function __construct(CacheableDependencyInterface $field_cacheability, array $values, $cardinality, $property_type) {
     assert($property_type === 'attributes' || $property_type === 'relationships');
-    $this->setCacheability(static::mergeCacheableDependencies(array_merge([$field_access_result], $values)));
+    $this->setCacheability(static::mergeCacheableDependencies(array_merge([$field_cacheability], $values)));
 
     $this->values = $values;
     $this->cardinality = $cardinality;

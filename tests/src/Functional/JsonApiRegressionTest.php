@@ -8,6 +8,7 @@ use Drupal\comment\Tests\CommentTestTrait;
 use Drupal\Component\Serialization\Json;
 use Drupal\Core\Field\FieldStorageDefinitionInterface;
 use Drupal\Core\Url;
+use Drupal\entity_test\Entity\EntityTest;
 use Drupal\field\Entity\FieldConfig;
 use Drupal\node\Entity\Node;
 use Drupal\node\Entity\NodeType;
@@ -556,6 +557,38 @@ class JsonApiRegressionTest extends JsonApiFunctionalTestBase {
       RequestOptions::BODY => Json::encode($body),
     ]);
     $this->assertSame(204, $response->getStatusCode());
+  }
+
+  /**
+   * Ensures that cacheability of computed fields is bubbled.
+   *
+   * @see https://www.drupal.org/project/drupal/issues/2352009
+   */
+  public function testNormalizedComputedFieldCacheabilityBubblingFromIssue2352009() {
+    // Set up data model.
+    $this->assertTrue($this->container->get('module_installer')
+      ->install(['jsonapi_test_computed_field'], TRUE), 'Installed modules.');
+    Role::load(RoleInterface::ANONYMOUS_ID)
+      ->grantPermission('view test entity')
+      ->save();
+
+    // Create data.
+    $entity_test = EntityTest::create([
+      'name' => 'Test Entity for Computed Field',
+      'type' => 'entity_test',
+    ]);
+    $entity_test->save();
+
+    // Test.
+    $url = Url::fromUri(sprintf('internal:/jsonapi/entity_test/entity_test/%s', $entity_test->uuid()));
+    $response = $this->request('GET', $url, []);
+    $this->assertSame(200, $response->getStatusCode());
+    // @see \Drupal\jsonapi_test_computed_field\JsonApiComputedFieldItemList::computeValue()
+    $this->assertContains('user', explode(' ', $response->getHeader('X-Drupal-Cache-Contexts')[0]));
+    $this->assertContains('field:jsonapi_test_computed_field', explode(' ', $response->getHeader('X-Drupal-Cache-Tags')[0]));
+    // @todo When https://www.drupal.org/project/drupal/issues/2352009 lands, we should assert that the max-age of the response is 8000.
+    $this->assertSame('MISS', $response->getHeader('X-Drupal-Cache')[0]);
+    $this->assertSame('UNCACHEABLE', $response->getHeader('X-Drupal-Dynamic-Cache')[0]);
   }
 
   /**

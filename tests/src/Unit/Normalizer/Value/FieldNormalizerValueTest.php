@@ -2,7 +2,7 @@
 
 namespace Drupal\Tests\jsonapi\Unit\Normalizer\Value;
 
-use Drupal\Core\Access\AccessResult;
+use Drupal\Core\Cache\CacheableMetadata;
 use Drupal\Core\DependencyInjection\ContainerBuilder;
 use Drupal\jsonapi\Normalizer\Value\FieldItemNormalizerValue;
 use Drupal\jsonapi\Normalizer\Value\FieldNormalizerValue;
@@ -45,7 +45,11 @@ class FieldNormalizerValueTest extends UnitTestCase {
    * @dataProvider rasterizeValueProvider
    */
   public function testRasterizeValue($values, $cardinality, $expected) {
-    $object = new FieldNormalizerValue(AccessResult::allowed()->cachePerUser()->addCacheTags(['field:foo']), $values, $cardinality, 'attributes');
+    $cacheability = new CacheableMetadata();
+    $cacheability->addCacheContexts(['user']);
+    $cacheability->addCacheTags(['field:foo']);
+    $cacheability->setCacheMaxAge(8000);
+    $object = new FieldNormalizerValue($cacheability, $values, $cardinality, 'attributes');
     $this->assertEquals($expected, $object->rasterizeValue());
     $this->assertSame(['ccfoo', 'user'], $object->getCacheContexts());
     $this->assertSame(['ctfoo', 'field:foo'], $object->getCacheTags());

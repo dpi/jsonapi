@@ -1,0 +1,43 @@
+<?php
+
+/**
+ * @file
+ * Module file for JSON API computed field test.
+ */
+
+use Drupal\Core\Entity\EntityTypeInterface;
+use Drupal\Core\Field\BaseFieldDefinition;
+use Drupal\jsonapi_test_computed_field\JsonApiComputedFieldItemList;
+
+/**
+ * Implements hook_entity_base_field_info().
+ */
+function jsonapi_test_computed_field_entity_base_field_info(EntityTypeInterface $entity_type) {
+  $fields = [];
+  if ($entity_type->id() === 'entity_test') {
+    $fields['jsonapi_test_computed_field'] = BaseFieldDefinition::create('string')
+      ->setLabel(t('JSON API test computed field'))
+      ->setDescription(t('JSON API test for computed field normalization.'))
+      ->setComputed(TRUE)
+      ->setClass(JsonApiComputedFieldItemList::class)
+      ->setDisplayConfigurable('form', TRUE)
+      ->setDisplayConfigurable('view', FALSE)
+      ->setReadOnly(FALSE)
+      ->setInternal(FALSE)
+      ->setDisplayOptions('view', [
+        'label' => 'hidden',
+        'region' => 'hidden',
+        'weight' => -5,
+      ])
+      ->setDisplayOptions('form', [
+        'label' => 'hidden',
+        'region' => 'hidden',
+        'weight' => -5,
+      ])
+      ->setTargetEntityTypeId('entity_test')
+      ->setTargetBundle('entity_test')
+      ->setName('jsonapi_test_computed_field');
+  }
+
+  return $fields;
+}

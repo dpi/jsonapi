@@ -1,0 +1,7 @@
+name: 'JSON API computed field test'
+description: 'JSON API test for computed field normalization'
+type: module
+package: Testing
+core: 8.x
+dependencies:
+  - drupal:entity_test
